@@ -1,0 +1,47 @@
+# 家谱 · 家族树 (Family Tree)
+
+一个纯前端、单文件为主的家谱管理应用：多家族树、父母/配偶/子女关系（含继父母、一夫多妻等特殊情况）、拖拽调整顺序、收起/展开、聚焦查看、家族分布地图、撤销/前进后退、ZIP 导出导入（含照片）。
+
+支持离线使用（Service Worker）和可安装为桌面/手机应用（PWA）。
+
+## 目录结构
+
+```
+family-tree-app/
+├── index.html          主应用（所有界面和逻辑都在这一个文件里）
+├── manifest.json        PWA 配置（应用名称、图标、主题色）
+├── service-worker.js     离线缓存
+├── icons/
+│   ├── icon-192.png
+│   └── icon-512.png
+└── README.md
+```
+
+## 部署到 GitHub Pages
+
+1. 新建一个 GitHub 仓库（比如叫 `family-tree`），把这个文件夹里的所有文件上传上去（保持目录结构，`icons/` 文件夹也要一起传）。
+2. 仓库页面 → **Settings** → **Pages**。
+3. **Source** 选择 `Deploy from a branch`，分支选 `main`（或你放代码的那个分支），目录选 `/ (root)`。
+4. 保存后等 1-2 分钟，GitHub 会给你一个网址，形如：
+   `https://你的用户名.github.io/family-tree/`
+5. 打开这个网址即可使用。手机浏览器打开后，可以用"添加到主屏幕"把它当App一样安装；电脑上 Chrome/Edge 地址栏右侧会出现"安装"图标，点了也能装成桌面应用。
+
+> 也可以不用 GitHub Pages，直接把 `index.html` 双击用浏览器打开使用——所有功能一样正常，只是这种情况下 Service Worker 不会启用（需要 http/https 协议才能注册），也没法"安装"成应用，纯粹是本地文件模式。
+
+## 数据存放在哪里
+
+- **人物、家族树等资料**：存在浏览器的 `localStorage`（或者 Claude 环境下的 `window.storage`），大概几MB以内。
+- **照片**：存在浏览器的 **IndexedDB**（专门存二进制数据的浏览器数据库），容量比 localStorage 大得多，不会因为存几张照片就爆掉。
+- 以上数据都是"**这台设备、这个浏览器**"本地的，换设备/换浏览器不会自动同步。**请定期用顶部"导出"功能打包成 .zip 备份**（里面包含所有资料和照片），换设备时用"导入"读回来即可。
+
+## 关于外部资源
+
+应用运行时会从公开 CDN 加载两样东西（可以正常联网时才会用到）：
+- [JSZip](https://cdnjs.cloudflare.com)：导出/导入 ZIP 文件用。
+- [flekschas/simple-world-map](https://github.com/flekschas/simple-world-map)（CC BY-SA 协议）：家族分布地图用的世界地图。
+
+如果打开时没有网络，导出导入功能和"真实世界地图"会暂时用不了或自动退回到简化版本，但家谱树本身的浏览、编辑、拖拽等核心功能不受影响（配合 Service Worker，首次联网访问后，这些外部资源大多也会被缓存下来供离线使用）。
+
+## 关于 Claude Code 集成开发
+
+如果之后想继续用 Claude 帮你改这个项目，用 [Claude Code](https://docs.claude.com) 在本地打开这个文件夹，直接说需求即可（比如"帮我加一个XX功能"），不需要每次都整份贴代码。

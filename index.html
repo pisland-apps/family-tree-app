@@ -1,0 +1,3138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>家谱 · 家族树</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23F6F1E4'/%3E%3Cpath d='M12 2v6M12 22v-4M12 8c-3 0-5 2-5 4.5S9 16 12 16s5-1.5 5-3.5S15 8 12 8Z' fill='none' stroke='%233F6656' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M7 12.5c-2 1-3 2.5-3 4.5M17 12.5c2 1 3 2.5 3 4.5M9 16l-2 4M15 16l2 4' fill='none' stroke='%233F6656' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#3F6656">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="家谱">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F1E4;
+  --bg-alt:#EDE3CC;
+  --ink:#2A2420;
+  --ink-soft:#6B5F51;
+  --accent:#3F6656;
+  --accent-2:#B9863C;
+  --line:#8B7355;
+  --card-bg:#FFFDF8;
+  --card-border:#DDD0B2;
+  --danger:#A6473A;
+  --radius:10px;
+  --shadow: 0 2px 8px rgba(60,45,20,0.10), 0 1px 2px rgba(60,45,20,0.08);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:'Inter',sans-serif;
+  background:
+    radial-gradient(ellipse at top left, #FBF6E9 0%, transparent 55%),
+    var(--bg);
+  color:var(--ink);
+  overflow:hidden;
+}
+h1,h2,h3,.display{font-family:'Fraunces',serif;}
+
+/* ---------- Top bar ---------- */
+.topbar{
+  height:64px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:0 18px;
+  background:var(--card-bg);
+  border-bottom:1px solid var(--card-border);
+  position:relative;
+  z-index:20;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-right:8px;
+  flex-shrink:0;
+}
+.brand .mark{
+  width:30px;height:30px;
+  color:var(--accent-2);
+}
+.brand .name{
+  font-size:19px;
+  font-weight:600;
+  letter-spacing:0.2px;
+}
+.brand .name .sub{
+  display:block;
+  font-family:'Inter',sans-serif;
+  font-size:10px;
+  font-weight:500;
+  letter-spacing:1.5px;
+  color:var(--ink-soft);
+  text-transform:uppercase;
+  margin-top:-2px;
+}
+.tree-switcher{
+  display:flex; align-items:center; gap:6px; margin-right:6px; flex-shrink:0;
+}
+.tree-switcher select{
+  font-family:'Inter',sans-serif; font-size:13px; font-weight:600; color:var(--ink);
+  background:var(--bg-alt); border:1px solid var(--card-border); border-radius:8px;
+  padding:8px 10px; max-width:160px; cursor:pointer; outline:none;
+}
+.tree-switcher select:focus{border-color:var(--accent);}
+.btn-icon-only{
+  width:32px; height:32px; border-radius:8px; border:1px solid var(--card-border);
+  background:transparent; color:var(--ink-soft); font-size:16px; font-weight:600;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.btn-icon-only:hover{background:var(--bg-alt);}
+.btn-icon-only:disabled{opacity:0.35; cursor:not-allowed;}
+.btn-icon-only:disabled:hover{background:transparent;}
+.search-wrap{
+  flex:1;
+  max-width:320px;
+  position:relative;
+}
+.search-wrap input{
+  width:100%;
+  padding:9px 12px 9px 34px;
+  border-radius:20px;
+  border:1px solid var(--card-border);
+  background:var(--bg-alt);
+  font-size:13.5px;
+  font-family:'Inter',sans-serif;
+  color:var(--ink);
+  outline:none;
+}
+.search-wrap input:focus{border-color:var(--accent);}
+.search-wrap svg{
+  position:absolute; left:11px; top:50%; transform:translateY(-50%);
+  width:15px;height:15px; color:var(--ink-soft); pointer-events:none;
+}
+.search-results{
+  position:absolute; top:calc(100% + 6px); left:0; right:0;
+  background:var(--card-bg); border:1px solid var(--card-border);
+  border-radius:8px; box-shadow:var(--shadow); max-height:260px; overflow-y:auto;
+  z-index:30; display:none;
+}
+.search-results.show{display:block;}
+.search-item{padding:8px 12px; cursor:pointer; font-size:13.5px; display:flex; align-items:center; gap:8px;}
+.search-item:hover{background:var(--bg-alt);}
+.topbar-actions{margin-left:auto; display:flex; gap:8px; flex-shrink:0;}
+
+.btn{
+  font-family:'Inter',sans-serif;
+  font-size:13px; font-weight:600;
+  padding:9px 15px;
+  opacity:1;
+  border-radius:8px;
+  border:1px solid transparent;
+  cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px;
+  transition:transform .12s ease, background .15s ease;
+  white-space:nowrap;
+}
+.btn:active{transform:scale(0.96);}
+.btn-primary{background:var(--accent); color:#fff;}
+.btn-primary:hover{background:#345548;}
+.btn-ghost{background:transparent; color:var(--ink-soft); border-color:var(--card-border);}
+.btn-ghost:hover{background:var(--bg-alt);}
+.btn-danger{background:transparent; color:var(--danger); border-color:#E4B8AE;}
+.btn-danger:hover{background:#FBEDEA;}
+.btn svg{width:15px;height:15px;}
+.btn-icon{padding:9px; }
+.btn:disabled{opacity:0.4; cursor:not-allowed;}
+.btn:disabled:hover{background:transparent;}
+
+/* ---------- Layout ---------- */
+.app{
+  height:calc(100% - 64px);
+  display:flex;
+}
+body.has-focus-bar .app{
+  height:calc(100% - 64px - 44px);
+}
+.focus-bar{
+  height:44px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:0 18px;
+  background:#EFE3C8;
+  border-bottom:1px solid var(--card-border);
+  color:var(--ink);
+  font-size:13px;
+}
+.focus-bar strong{font-weight:700;}
+.focus-stepper{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft);}
+.focus-stepper button{
+  width:20px; height:20px; border-radius:50%; border:1px solid var(--card-border);
+  background:var(--card-bg); color:var(--ink); cursor:pointer; font-size:13px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+}
+.focus-stepper button:hover{background:var(--accent); color:#fff; border-color:var(--accent);}
+.focus-stepper span{min-width:14px; text-align:center; font-weight:600; color:var(--ink);}
+.focus-sideways-group{display:flex; align-items:center; gap:5px; flex-wrap:wrap;}
+.sideways-chip{
+  font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
+  padding:6px 10px; border-radius:14px; border:1px solid var(--card-border);
+  background:var(--card-bg); color:var(--ink-soft); cursor:pointer;
+}
+.sideways-chip.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+.canvas-wrap{
+  flex:1;
+  position:relative;
+  overflow:hidden;
+  background:
+    linear-gradient(var(--bg-alt) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-alt) 1px, transparent 1px);
+  background-size:28px 28px;
+  background-position:-1px -1px;
+}
+.canvas{
+  position:absolute;
+  top:0; left:0;
+  transform-origin:0 0;
+  padding:70px 90px;
+}
+.gen-row{
+  display:flex;
+  align-items:flex-start;
+  gap:46px;
+  margin-bottom:120px;
+  position:relative;
+}
+.gen-label{
+  position:absolute;
+  left:-78px;
+  top:50%;
+  transform:translateY(-50%);
+  width:64px;
+  text-align:right;
+  font-size:11.5px;
+  font-weight:700;
+  color:var(--ink-soft);
+  letter-spacing:0.5px;
+  white-space:nowrap;
+}
+.unit{
+  display:flex;
+  align-items:center;
+  gap:0;
+  position:relative;
+}
+.draggable-unit{cursor:grab; touch-action:none;}
+.draggable-unit.dragging{opacity:0.4;}
+.draggable-unit.drag-over{
+  outline:2px dashed var(--accent-2);
+  outline-offset:4px;
+  border-radius:12px;
+}
+.card{
+  width:150px;
+  background:var(--card-bg);
+  border:1px solid var(--card-border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:12px 10px 10px;
+  cursor:pointer;
+  position:relative;
+  transition:transform .15s ease, box-shadow .15s ease;
+  text-align:center;
+}
+.card:hover{transform:translateY(-3px); box-shadow:0 6px 16px rgba(60,45,20,0.16);}
+.card.selected{outline:2px solid var(--accent-2); outline-offset:2px;}
+.avatar{
+  width:56px;height:56px;border-radius:50%;
+  margin:0 auto 8px;
+  background:var(--bg-alt);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fraunces',serif; font-weight:600; font-size:20px;
+  color:var(--accent);
+  border:2px solid var(--card-border);
+  overflow:hidden;
+  flex-shrink:0;
+}
+.avatar img{width:100%;height:100%;object-fit:cover;}
+.card .cname{font-size:13.5px; font-weight:600; line-height:1.25; word-break:break-word;}
+.card .cyears{font-size:11px; color:var(--ink-soft); margin-top:2px;}
+.card.gender-f{border-top:3px solid #B25E77;}
+.card.gender-m{border-top:3px solid #4A7A9E;}
+.card.gender-o{border-top:3px solid var(--accent-2);}
+.collapse-toggle{
+  position:absolute; top:6px; right:6px;
+  width:22px; height:22px; border-radius:50%;
+  border:none; background:var(--bg-alt); color:var(--ink-soft);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; opacity:0.55; transition:opacity .15s ease, background .15s ease, color .15s ease;
+  z-index:2;
+}
+.collapse-toggle svg{width:13px;height:13px; flex-shrink:0;}
+.card:hover .collapse-toggle{opacity:1;}
+.collapse-toggle:hover{background:var(--accent); color:#fff;}
+.collapse-toggle.is-collapsed{
+  background:var(--accent-2); color:#fff; opacity:1;
+  width:auto; min-width:22px; padding:0 6px; border-radius:11px; gap:3px;
+}
+.collapse-toggle .collapse-count{font-size:10px; font-weight:700;}
+.count-badge{
+  display:inline-block; margin-left:5px; min-width:16px; padding:0 4px; border-radius:8px;
+  background:var(--accent-2); color:#fff; font-size:10px; font-weight:700; line-height:16px; text-align:center;
+}
+.count-badge:empty{display:none;}
+.filter-row{
+  display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:7px; cursor:pointer;
+}
+.filter-row:hover{background:var(--bg-alt);}
+.filter-row input[type=checkbox]{width:16px; height:16px; accent-color:var(--accent); flex-shrink:0;}
+.filter-row .mini-avatar{width:24px;height:24px;border-radius:50%; background:var(--bg-alt); display:flex;align-items:center;justify-content:center; font-size:10px; font-weight:700; color:var(--accent); overflow:hidden; flex-shrink:0; border:1px solid var(--card-border);}
+.filter-row .mini-avatar img{width:100%;height:100%;object-fit:cover;}
+.filter-row .fname{font-size:13px; flex:1;}
+.filter-row .fmeta{font-size:11px; color:var(--ink-soft);}
+.card.bridge-card{border-style:dashed;}
+.bridge-badge{
+  margin-top:6px;
+  font-size:10px;
+  font-weight:700;
+  color:var(--accent);
+  background:var(--bg-alt);
+  border-radius:10px;
+  padding:2px 7px;
+  display:inline-block;
+  cursor:pointer;
+}
+.bridge-badge:hover{background:var(--accent); color:#fff;}
+.card-tooltip{
+  position:absolute;
+  bottom:calc(100% + 10px);
+  left:50%;
+  transform:translateX(-50%);
+  width:210px;
+  background:var(--ink);
+  color:#fff;
+  padding:9px 11px;
+  border-radius:8px;
+  font-size:11.5px;
+  line-height:1.55;
+  text-align:left;
+  white-space:pre-wrap;
+  opacity:0;
+  visibility:hidden;
+  transition:opacity .15s ease;
+  pointer-events:none;
+  z-index:20;
+  box-shadow:0 6px 18px rgba(0,0,0,0.25);
+}
+.card-tooltip::after{
+  content:'';
+  position:absolute;
+  top:100%; left:50%; transform:translateX(-50%);
+  border:6px solid transparent;
+  border-top-color:var(--ink);
+}
+.card:hover .card-tooltip{opacity:1; visibility:visible;}
+.couple-card{
+  display:flex;
+  align-items:stretch;
+  background:var(--card-bg);
+  border:1px solid var(--card-border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  overflow:visible;
+  cursor:default;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.couple-card:hover{transform:translateY(-3px); box-shadow:0 6px 16px rgba(60,45,20,0.16);}
+.couple-card .card:first-child{border-top-left-radius:var(--radius); border-bottom-left-radius:var(--radius);}
+.couple-card .card:last-child{border-top-right-radius:var(--radius); border-bottom-right-radius:var(--radius);}
+.couple-card .card{
+  border-left:none; border-right:none; border-bottom:none;
+  border-radius:0; box-shadow:none;
+}
+.couple-card .card:hover{transform:none; box-shadow:none;}
+.couple-card .card + .card{border-left:1px solid var(--card-border);}
+
+svg.connectors{
+  position:absolute; top:0; left:0; pointer-events:none; overflow:visible;
+}
+
+/* ---------- Empty state ---------- */
+.empty-state{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; text-align:center; gap:16px;
+  padding:20px;
+}
+.empty-state svg{width:64px;height:64px; color:var(--card-border);}
+.empty-state h2{font-size:22px; margin:0; color:var(--ink);}
+.empty-state p{font-size:14px; color:var(--ink-soft); max-width:340px; margin:0;}
+
+/* ---------- Side detail panel ---------- */
+.side-panel{
+  width:320px;
+  background:var(--card-bg);
+  border-left:1px solid var(--card-border);
+  padding:22px;
+  overflow-y:auto;
+  flex-shrink:0;
+  transform:translateX(0);
+  transition:margin-right .2s ease;
+  position:relative;
+}
+.panel-close-btn{
+  position:absolute; top:14px; right:14px;
+  width:26px; height:26px; border-radius:50%;
+  border:none; background:var(--bg-alt); color:var(--ink-soft);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; font-size:15px; line-height:1; z-index:5;
+}
+.panel-close-btn:hover{background:var(--danger); color:#fff;}
+.side-panel.hidden{display:none;}
+.detail-avatar{
+  width:88px;height:88px;border-radius:50%;
+  margin:0 auto 14px;
+  background:var(--bg-alt);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fraunces',serif; font-weight:600; font-size:32px; color:var(--accent);
+  border:3px solid var(--card-border); overflow:hidden;
+}
+.detail-avatar img{width:100%;height:100%;object-fit:cover;}
+.panel-hide-toggle{
+  position:absolute; top:-4px; right:-4px;
+  width:28px; height:28px; border-radius:50%;
+  border:2px solid var(--card-bg); background:var(--bg-alt); color:var(--ink-soft);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; opacity:0.85; transition:opacity .15s ease, background .15s ease, color .15s ease;
+  box-shadow:var(--shadow);
+}
+.panel-hide-toggle svg{width:15px;height:15px;}
+.panel-hide-toggle:hover{opacity:1; background:var(--danger); color:#fff;}
+.panel-hide-toggle.is-hidden{background:var(--danger); color:#fff; opacity:1;}
+.detail-name{text-align:center; font-size:20px; font-weight:600; margin-bottom:2px;}
+.detail-years{text-align:center; font-size:13px; color:var(--ink-soft); margin-bottom:16px;}
+.bridge-notice{
+  text-align:center; font-size:12px; font-weight:600; color:var(--accent);
+  background:var(--bg-alt); border-radius:8px; padding:8px 10px; margin-bottom:14px; cursor:pointer;
+}
+.bridge-notice:hover{background:var(--accent); color:#fff;}
+.detail-notes{
+  font-size:13px; color:var(--ink-soft); line-height:1.6;
+  background:var(--bg-alt); border-radius:8px; padding:10px 12px; margin-bottom:16px;
+  white-space:pre-wrap;
+}
+.detail-section-title{
+  font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700;
+  color:var(--ink-soft); margin:16px 0 8px;
+}
+.rel-list{display:flex; flex-direction:column; gap:6px;}
+.rel-chip{
+  display:flex; align-items:center; gap:8px;
+  padding:6px 8px; border-radius:7px; background:var(--bg-alt);
+  font-size:13px; cursor:pointer;
+}
+.rel-chip:hover{background:#E4D8BC;}
+.rel-chip .mini-avatar{
+  width:22px;height:22px;border-radius:50%; background:var(--card-bg);
+  display:flex;align-items:center;justify-content:center; font-size:10px; font-weight:700; color:var(--accent);
+  overflow:hidden; flex-shrink:0; border:1px solid var(--card-border);
+}
+.rel-chip .mini-avatar img{width:100%;height:100%;object-fit:cover;}
+.quick-actions{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px;}
+.quick-actions .btn{flex:1; justify-content:center; font-size:12.5px; padding:8px 10px;}
+.detail-footer{display:flex; gap:8px; margin-top:22px; border-top:1px solid var(--card-border); padding-top:16px;}
+.detail-footer .btn{flex:1; justify-content:center;}
+
+/* ---------- Zoom controls ---------- */
+.zoom-controls{
+  position:absolute; bottom:18px; right:18px; z-index:15;
+  display:flex; flex-direction:column; gap:6px;
+  background:var(--card-bg); border:1px solid var(--card-border);
+  border-radius:10px; box-shadow:var(--shadow); padding:6px;
+}
+.zoom-controls button{
+  width:32px;height:32px; border:none; background:transparent; cursor:pointer;
+  border-radius:6px; font-size:16px; color:var(--ink); display:flex;align-items:center;justify-content:center;
+}
+.zoom-controls button:hover{background:var(--bg-alt);}
+
+/* ---------- Modal ---------- */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(30,24,16,0.45);
+  display:none; align-items:center; justify-content:center; z-index:100; padding:20px;
+}
+.modal-overlay.show{display:flex;}
+.modal{
+  background:var(--card-bg); border-radius:14px; width:100%; max-width:440px;
+  max-height:88vh; overflow-y:auto; box-shadow:0 20px 50px rgba(30,20,10,0.3);
+}
+.modal-header{
+  padding:20px 22px 0; display:flex; align-items:center; justify-content:space-between;
+}
+.modal-header h2{font-size:19px; margin:0;}
+.modal-close{background:none; border:none; cursor:pointer; color:var(--ink-soft); font-size:20px; line-height:1; padding:4px;}
+.modal-body{padding:16px 22px 22px;}
+.help-body{padding-top:6px;}
+.map-modal{max-width:min(1100px, 94vw); width:100%;}
+.map-controls{
+  display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:12.5px; color:var(--ink-soft);
+}
+.map-controls select{
+  font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; color:var(--ink);
+  background:var(--bg-alt); border:1px solid var(--card-border); border-radius:7px; padding:6px 9px; cursor:pointer;
+}
+.map-canvas-outer{position:relative; width:100%;}
+.map-canvas-wrap{
+  position:relative; width:100%; border-radius:12px; overflow:hidden;
+  border:1px solid var(--card-border); background:#BFDCE0;
+}
+.map-pin{cursor:pointer;}
+.map-pin circle{transition:r .12s ease;}
+.map-pin:hover circle{r:9;}
+.map-pin text{font-family:'Inter',sans-serif; font-weight:700; pointer-events:none;}
+.map-popover{
+  position:absolute; background:var(--card-bg); border:1px solid var(--card-border);
+  border-radius:10px; box-shadow:var(--shadow); padding:10px 12px; min-width:170px;
+  max-height:220px; overflow-y:auto; z-index:30; font-size:12.5px;
+}
+.map-popover .mp-title{font-weight:700; margin-bottom:6px; color:var(--accent);}
+.map-popover .mp-person{
+  display:flex; align-items:center; gap:7px; padding:5px 4px; border-radius:6px; cursor:pointer;
+}
+.map-popover .mp-person:hover{background:var(--bg-alt);}
+.map-popover .mp-avatar{
+  width:20px; height:20px; border-radius:50%; background:var(--bg-alt); flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--accent);
+  overflow:hidden; border:1px solid var(--card-border);
+}
+.map-popover .mp-avatar img{width:100%; height:100%; object-fit:cover;}
+.map-empty{padding:40px 20px; text-align:center; color:var(--ink-soft); font-size:13px;}
+.map-credit{
+  position:absolute; right:8px; bottom:6px; font-size:10px; color:var(--ink-soft);
+  background:rgba(255,253,248,0.75); padding:2px 6px; border-radius:5px;
+}
+.map-credit a{color:var(--ink-soft);}
+.help-section{margin-bottom:20px;}
+.help-section:last-child{margin-bottom:4px;}
+.help-section h3{
+  font-family:'Fraunces',serif; font-size:15.5px; font-weight:600; color:var(--accent);
+  margin:0 0 8px; padding-bottom:6px; border-bottom:1px solid var(--card-border);
+}
+.help-section ul{margin:0; padding-left:18px; display:flex; flex-direction:column; gap:7px;}
+.help-section li{font-size:13px; line-height:1.6; color:var(--ink);}
+.help-section b{color:var(--ink); font-weight:700;}
+.help-section kbd{
+  font-family:'Inter',sans-serif; font-size:11px; background:var(--bg-alt);
+  border:1px solid var(--card-border); border-radius:4px; padding:1px 6px;
+}
+.field{margin-bottom:14px;}
+.field label{display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:5px;}
+.field input[type=text], .field input[type=number], .field select, .field textarea{
+  width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--card-border);
+  font-family:'Inter',sans-serif; font-size:13.5px; background:var(--bg); color:var(--ink); outline:none;
+}
+.field input:focus, .field select:focus, .field textarea:focus{border-color:var(--accent);}
+.field-row{display:flex; gap:10px;}
+.field-row .field{flex:1;}
+.gender-toggle{display:flex; gap:8px;}
+.gender-toggle label{
+  flex:1; text-align:center; padding:9px 4px; border-radius:8px; border:1px solid var(--card-border);
+  font-size:13px; cursor:pointer; color:var(--ink-soft); font-weight:500;
+}
+.gender-toggle input{display:none;}
+.gender-toggle input:checked + span{color:#fff;}
+.gender-toggle label:has(input:checked){background:var(--accent); border-color:var(--accent); color:#fff;}
+.photo-row{display:flex; align-items:center; gap:12px;}
+.photo-preview{
+  width:56px;height:56px;border-radius:50%; background:var(--bg-alt);
+  display:flex;align-items:center;justify-content:center; overflow:hidden; border:1px solid var(--card-border); flex-shrink:0;
+}
+.photo-preview img{width:100%;height:100%;object-fit:cover;}
+.multi-select{
+  display:flex; flex-wrap:wrap; gap:6px; max-height:120px; overflow-y:auto;
+  border:1px solid var(--card-border); border-radius:8px; padding:8px; background:var(--bg);
+}
+.multi-select label{
+  font-size:12px; padding:5px 9px; border-radius:14px; border:1px solid var(--card-border);
+  cursor:pointer; background:var(--card-bg); color:var(--ink-soft);
+}
+.multi-select input{display:none;}
+.multi-select label:has(input:checked){background:var(--accent); color:#fff; border-color:var(--accent);}
+.multi-select .none{font-size:12px; color:var(--ink-soft); padding:4px;}
+.quick-add-row{display:flex; gap:8px; margin-top:8px;}
+.quick-add-row input{
+  flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--card-border);
+  font-family:'Inter',sans-serif; font-size:12.5px; background:var(--bg); color:var(--ink); outline:none;
+}
+.quick-add-row input:focus{border-color:var(--accent);}
+.quick-add-row .btn{padding:8px 12px; font-size:12px; flex-shrink:0;}
+.modal-footer{display:flex; gap:10px; margin-top:6px;}
+.modal-footer .btn{flex:1; justify-content:center;}
+.hint{font-size:11.5px; color:var(--ink-soft); margin-top:4px;}
+.toast{
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+  background:var(--ink); color:#fff; padding:10px 18px; border-radius:20px;
+  font-size:13px; z-index:200; opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(-4px);}
+input[type=file]{font-size:12px;}
+
+@media (max-width:720px){
+  .side-panel{position:fixed; right:0; top:64px; bottom:0; z-index:40; box-shadow:-8px 0 24px rgba(0,0,0,0.15);}
+  .brand .name{font-size:16px;}
+  .brand .sub{display:none;}
+  .search-wrap{max-width:none;}
+  .topbar{padding:0 10px; gap:6px;}
+  .btn span.label{display:none;}
+  .tree-switcher select{max-width:90px; padding:8px 6px; font-size:12px;}
+  .btn-icon-only{width:28px; height:28px; font-size:14px;}
+}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6M12 22v-4M12 8c-3 0-5 2-5 4.5S9 16 12 16s5-1.5 5-3.5S15 8 12 8Z"/><path d="M7 12.5c-2 1-3 2.5-3 4.5M17 12.5c2 1 3 2.5 3 4.5M9 16l-2 4M15 16l2 4"/></svg>
+    <div class="name">家谱<span class="sub">Family Tree</span></div>
+  </div>
+  <div class="tree-switcher">
+    <button class="btn-icon-only" id="navBackBtn" title="返回上一步浏览" disabled>←</button>
+    <button class="btn-icon-only" id="navForwardBtn" title="前进下一步浏览" disabled>→</button>
+    <select id="treeSelect" title="切换家族树"></select>
+    <button class="btn-icon-only" id="renameTreeBtn" title="重命名当前家族树">✎</button>
+    <button class="btn-icon-only" id="addTreeBtn" title="新建一棵家族树">+</button>
+  </div>
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="searchInput" type="text" placeholder="搜索家庭成员…" autocomplete="off">
+    <div class="search-results" id="searchResults"></div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost" id="mapBtn" title="家族分布地图">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20 3 17V4l6 3m0 13 6-3m-6 3V7m6 10 6 3V7l-6-3m0 16V4m0 3-6-3"/></svg>
+      <span class="label">地图</span>
+    </button>
+    <button class="btn btn-ghost" id="helpBtn" title="使用说明">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 1.7-2.4 3.5"/><path d="M12 17h.01"/></svg>
+      <span class="label">帮助</span>
+    </button>
+    <button class="btn btn-ghost" id="undoBtn" title="撤销上一步操作 (Ctrl+Z)" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      <span class="label">撤销</span>
+    </button>
+    <button class="btn btn-ghost" id="hiddenBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.5V19l4 2v-8.5L22 3Z"/></svg>
+      <span class="label">显示筛选<span class="count-badge" id="hiddenCount"></span></span>
+    </button>
+    <button class="btn btn-primary" id="addRootBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      <span class="label">添加成员</span>
+    </button>
+    <button class="btn btn-ghost" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span class="label">导出</span></button>
+    <button class="btn btn-ghost" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V9m0 0 4 4m-4-4-4 4M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/></svg><span class="label">导入</span></button>
+    <input type="file" id="importFile" accept=".json,.zip" style="display:none">
+  </div>
+</div>
+
+<div class="focus-bar" id="focusBar" style="display:none;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;flex-shrink:0;"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M22 12h-3M5 12H2M19.07 4.93l-2.12 2.12M7.05 16.95l-2.12 2.12M19.07 19.07l-2.12-2.12M7.05 7.05 4.93 4.93"/></svg>
+  <span class="focus-label">聚焦查看：<strong id="focusName"></strong></span>
+  <span class="focus-stepper">
+    上溯
+    <button data-focus-adjust="up" data-delta="-1">−</button>
+    <span id="focusUpVal">2</span>
+    <button data-focus-adjust="up" data-delta="1">+</button>
+    代
+  </span>
+  <span class="focus-stepper">
+    下延
+    <button data-focus-adjust="down" data-delta="-1">−</button>
+    <span id="focusDownVal">2</span>
+    <button data-focus-adjust="down" data-delta="1">+</button>
+    代
+  </span>
+  <span class="focus-sideways-group" id="focusSidewaysToggles"></span>
+  <button class="btn btn-ghost" id="exitFocusBtn" style="margin-left:auto;">退出聚焦，显示全部</button>
+</div>
+
+<div class="app">
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="canvas" id="canvas"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2v6M12 22v-4M12 8c-3 0-5 2-5 4.5S9 16 12 16s5-1.5 5-3.5S15 8 12 8Z"/><path d="M7 12.5c-2 1-3 2.5-3 4.5M17 12.5c2 1 3 2.5 3 4.5M9 16l-2 4M15 16l2 4"/></svg>
+      <h2>还没有家庭成员</h2>
+      <p>从添加第一位成员开始 —— 可以是你自己，或者家族里最年长的长辈。之后可以为TA添加配偶、子女和父母。</p>
+      <button class="btn btn-primary" id="emptyAddBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        添加第一位成员
+      </button>
+    </div>
+    <div class="zoom-controls">
+      <button id="zoomIn">+</button>
+      <button id="zoomReset" style="font-size:11px;">100%</button>
+      <button id="zoomOut">−</button>
+    </div>
+  </div>
+
+  <div class="side-panel hidden" id="sidePanel"></div>
+</div>
+
+<!-- Add / Edit modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">添加成员</h2>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>姓名 *</label>
+        <input type="text" id="fName" placeholder="例如：王建国">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>性别</label>
+          <div class="gender-toggle">
+            <label><input type="radio" name="gender" value="M" checked><span>男</span></label>
+            <label><input type="radio" name="gender" value="F"><span>女</span></label>
+            <label><input type="radio" name="gender" value="O"><span>其他</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>出生年份</label>
+          <input type="number" id="fBirth" placeholder="1980">
+        </div>
+        <div class="field">
+          <label>逝世年份（如适用）</label>
+          <input type="number" id="fDeath" placeholder="留空表示在世">
+        </div>
+      </div>
+      <div class="field">
+        <label>照片（可选）</label>
+        <div class="photo-row">
+          <div class="photo-preview" id="photoPreview">👤</div>
+          <input type="file" id="fPhoto" accept="image/*">
+        </div>
+      </div>
+      <div class="field">
+        <label>居住国家（可选）</label>
+        <input type="text" id="fCountry" list="countryList" placeholder="例如：马来西亚">
+        <datalist id="countryList"></datalist>
+      </div>
+      <div class="field">
+        <label>备注</label>
+        <textarea id="fNotes" rows="2" placeholder="职业、故事、性格……"></textarea>
+      </div>
+      <div class="field" id="parentsField">
+        <label>父母（最多选4位，可用于继父/继母等特殊情况）</label>
+        <div class="multi-select" id="parentsSelect"></div>
+        <div class="quick-add-row">
+          <input type="text" id="parentQuickName" placeholder="家谱里还没有？输入姓名新建一位…">
+          <button type="button" class="btn btn-ghost" id="parentQuickAdd">+ 新建</button>
+        </div>
+      </div>
+      <div class="field" id="spousesField">
+        <label>配偶（可添加多位）</label>
+        <div class="multi-select" id="spousesSelect"></div>
+        <div class="quick-add-row">
+          <input type="text" id="spouseQuickName" placeholder="家谱里还没有？输入姓名新建一位…">
+          <button type="button" class="btn btn-ghost" id="spouseQuickAdd">+ 新建</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="cancelBtn">取消</button>
+        <button class="btn btn-primary" id="saveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="exportOverlay">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <h2>导出家族树</h2>
+      <button class="modal-close" id="exportClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>导出范围</label>
+        <select id="exportScopeSelect">
+          <option value="">全部家族树（所有树打包在一起）</option>
+        </select>
+      </div>
+      <p class="hint">单独导出某一棵树时，会包含这棵树本身的成员，以及跟他们联姻的"桥梁"配偶（这样关系还能正常显示），但不会带上配偶自己那棵树的其余亲属——方便只把这一支的资料分享给对应的家族成员。</p>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="exportCancel">取消</button>
+        <button class="btn btn-primary" id="exportConfirm">导出</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="mapOverlay">
+  <div class="modal map-modal">
+    <div class="modal-header">
+      <h2>家族分布地图</h2>
+      <button class="modal-close" id="mapClose">✕</button>
+    </div>
+    <div class="modal-body map-body">
+      <p class="hint" style="margin-bottom:10px;">显示所有填写了"居住国家"的成员（示意图，非精确地理坐标）。点击图钉查看名单。</p>
+      <div class="map-controls">
+        <label for="mapHubSelect">连接线起点：</label>
+        <select id="mapHubSelect"><option value="">不显示连接线</option></select>
+      </div>
+      <div class="map-canvas-outer" id="mapCanvasOuter">
+        <div class="map-canvas-wrap" id="mapCanvasWrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="helpOverlay">
+  <div class="modal help-modal" style="max-width:640px;">
+    <div class="modal-header">
+      <h2>使用说明</h2>
+      <button class="modal-close" id="helpClose">✕</button>
+    </div>
+    <div class="modal-body help-body">
+
+      <div class="help-section">
+        <h3>基本操作</h3>
+        <ul>
+          <li><b>添加成员</b>：点顶部"＋ 添加成员"，或在某人详情面板里点"＋父母／＋配偶／＋子女"快速添加有关系的人。</li>
+          <li><b>建立关系</b>：编辑弹窗里的"父母"最多可选4位（用于继父母等特殊情况），"配偶"可选多位（支持一夫多妻/一妻多夫）。列表里没有的人，可以直接输入姓名点"＋新建"当场创建。</li>
+          <li><b>编辑 / 删除 / 隐藏</b>：点开某人的卡片打开详情面板，底部有对应按钮。删除会移除关系但不会删除对方本人；隐藏只是不显示，数据还在。</li>
+          <li><b>备注</b>：填写后，鼠标悬停在卡片上会弹出提示框显示内容。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>浏览家谱树</h3>
+        <ul>
+          <li><b>缩放</b>：直接滚动鼠标滚轮，或用右下角 ＋／－ 按钮。</li>
+          <li><b>平移</b>：按住空白处拖动画面。</li>
+          <li><b>收起／展开下一代</b>：有子女的人卡片右上角会有一个圆形按钮，点一下收起这个人往下的所有后代（不影响其他人），再点一下展开。</li>
+          <li><b>拖拽调整顺序</b>：按住卡片（或合并的夫妻卡片）拖到同一排的另一个位置，可以手动纠正自动排版不理想的地方。</li>
+          <li><b>点姓名 vs 点卡片</b>：点<b>姓名文字</b>会直接进入"聚焦查看"；点卡片其他地方（头像、年份）打开详情面板。</li>
+          <li>每一排左侧会标注"第N代"。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>聚焦查看</h3>
+        <ul>
+          <li>点某人的姓名，或在详情面板点"聚焦查看此人"，只显示这个人相关的家庭，其他人暂时隐藏。</li>
+          <li>顶部会出现聚焦工具条：可以分别调整"上溯几代祖先"、"下延几代后代"。</li>
+          <li>"旁支"按代数分别开关——比如只想看父母那一代的兄弟姐妹（叔叔阿姨），但不想看祖父母那代的，可以只点亮对应那一档。</li>
+          <li>点"退出聚焦，显示全部"回到完整视图。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>显示筛选（隐藏/显示成员）</h3>
+        <ul>
+          <li>顶部"显示筛选"按钮打开一个清单，可以逐个勾选/取消勾选任何人。</li>
+          <li>取消勾选某人，会连同TA的所有后代一起隐藏；配偶和父母不受影响。</li>
+          <li>面板里可以搜索、"全部显示/全部隐藏"一键操作。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>多个家族树</h3>
+        <ul>
+          <li>顶部下拉菜单可以切换不同的家族树（比如"我的家族"和"妻子的家族"分开管理）。</li>
+          <li>点"＋"新建一棵树；点"✎"重命名当前树。</li>
+          <li>两棵树之间的<b>配偶</b>会自动作为"桥梁人物"（虚线边框卡片）互相显示，点桥梁标签可以跳转过去；你们共同的<b>子女、孙辈</b>也会同时出现在两棵树里。</li>
+          <li>已有的人可以在详情面板用"移动到其他家族树…"整支搬到另一棵树。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>撤销与浏览历史</h3>
+        <ul>
+          <li><b>撤销</b>（顶部按钮或 <kbd>Ctrl+Z</kbd>）：恢复上一步的数据改动（添加、编辑、删除、隐藏、拖拽顺序等），最多连续撤销30步。</li>
+          <li><b>← →</b>：跟浏览器前进/后退类似，记录的是"你看到哪里了"（选中了谁、切换了哪棵树、聚焦了谁），不会改变任何数据。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>导出与导入</h3>
+        <ul>
+          <li>"导出"会打包成一个 <b>.zip</b> 文件，里面包含数据和所有照片，方便备份或换设备使用。</li>
+          <li>"导入"支持 .zip（含照片）或旧版 .json（不含照片）文件。</li>
+          <li>照片存在浏览器本地，不会跨设备同步——建议定期导出备份。</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>家族分布地图</h3>
+        <ul>
+          <li>在编辑成员时填写"居住国家"，顶部"地图"按钮会打开一张示意世界地图，把填了国家的成员按国家分组标出来（人数会显示在图钉旁边）。</li>
+          <li>点图钉可以看到这个国家有哪些成员，点名字会直接跳过去并选中TA（如果TA在另一棵家族树，会自动切换过去）。</li>
+          <li>地图上方可以手动选择"连接线起点"（比如家族发源地），选中后会用金色曲线把它跟其他国家连起来；不选就不显示连接线。</li>
+          <li>Hong Kong/澳门等极少数地区在地图数据里没有单独的行政区形状，只能用大致经纬度定位，可能不够精确。</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="moveTreeOverlay">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <h2>移动到其他家族树</h2>
+      <button class="modal-close" id="moveTreeClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="hint" id="moveTreeSubject" style="margin-bottom:12px;"></p>
+      <div class="field">
+        <label>目标家族树</label>
+        <select id="moveTreeSelect"></select>
+      </div>
+      <div class="field">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer;">
+          <input type="checkbox" id="moveTreeCascade" checked style="width:16px;height:16px;">
+          同时移动TA的所有后代
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="moveTreeCancel">取消</button>
+        <button class="btn btn-primary" id="moveTreeConfirm">确认移动</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="hiddenOverlay">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h2>显示筛选</h2>
+      <button class="modal-close" id="hiddenClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="hint" style="margin-bottom:10px;">取消勾选可以隐藏某人（连同TA的所有子孙后代分支）；重新勾选即可恢复。配偶和父母不受影响，仍会正常显示。</p>
+      <div class="field" style="margin-bottom:10px;">
+        <input type="text" id="filterSearch" placeholder="搜索成员筛选列表…">
+      </div>
+      <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <button class="btn btn-ghost" id="filterShowAll" style="flex:1; justify-content:center;">全部显示</button>
+        <button class="btn btn-ghost" id="filterHideAll" style="flex:1; justify-content:center;">全部隐藏</button>
+      </div>
+      <div class="rel-list" id="hiddenList" style="max-height:340px; overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ Storage abstraction ============ */
+const STORE_KEY = 'family-tree-people-v1';
+const hasClaudeStorage = (typeof window.storage !== 'undefined' && window.storage !== null);
+const DEFAULT_TREES = [{id:'main', name:'我的家族'}];
+
+async function loadData(){
+  let raw = null;
+  try{
+    if(hasClaudeStorage){
+      const res = await window.storage.get(STORE_KEY, false);
+      raw = res && res.value ? JSON.parse(res.value) : null;
+    } else {
+      const stored = localStorage.getItem(STORE_KEY);
+      raw = stored ? JSON.parse(stored) : null;
+    }
+  }catch(e){ raw = null; }
+
+  if(!raw) return { people: [], trees: DEFAULT_TREES.slice(), currentTreeId: 'main' };
+  if(Array.isArray(raw)){
+    // legacy format from before multi-tree support: a plain people array
+    return { people: raw, trees: DEFAULT_TREES.slice(), currentTreeId: 'main' };
+  }
+  return {
+    people: raw.people || [],
+    trees: (raw.trees && raw.trees.length) ? raw.trees : DEFAULT_TREES.slice(),
+    currentTreeId: raw.currentTreeId || (raw.trees && raw.trees[0] && raw.trees[0].id) || 'main'
+  };
+}
+let saveTimer=null;
+function saveData(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async ()=>{
+    const json = JSON.stringify({ people, trees, currentTreeId });
+    try{
+      if(hasClaudeStorage){ await window.storage.set(STORE_KEY, json, false); }
+      else{ localStorage.setItem(STORE_KEY, json); }
+    }catch(e){ console.error('保存失败', e); }
+  }, 250);
+}
+
+/* ============ Country coordinates (approximate centroids, for the map view) ============ */
+const COUNTRY_COORDS = {
+  '中国':{lat:35,lng:105,iso:'cn'}, '香港':{lat:22.3,lng:114.2,iso:null}, '澳门':{lat:22.2,lng:113.5,iso:null}, '台湾':{lat:23.7,lng:121,iso:'tw'},
+  '马来西亚':{lat:4,lng:102,iso:'my'}, '新加坡':{lat:1.35,lng:103.8,iso:'sg'}, '印度尼西亚':{lat:-0.8,lng:113.9,iso:'id'}, '泰国':{lat:15,lng:101,iso:'th'},
+  '菲律宾':{lat:12.9,lng:121.8,iso:'ph'}, '越南':{lat:16,lng:107.8,iso:'vn'}, '缅甸':{lat:21.9,lng:96,iso:'mm'}, '柬埔寨':{lat:12.6,lng:105,iso:'kh'},
+  '老挝':{lat:19.9,lng:102.6,iso:'la'}, '文莱':{lat:4.5,lng:114.7,iso:'bn'}, '日本':{lat:36.2,lng:138.3,iso:'jp'}, '韩国':{lat:36.5,lng:127.8,iso:'kr'},
+  '朝鲜':{lat:40.3,lng:127.5,iso:'kp'}, '蒙古':{lat:46.9,lng:103.8,iso:'mn'}, '印度':{lat:22,lng:79,iso:'in'}, '巴基斯坦':{lat:30,lng:70,iso:'pk'},
+  '孟加拉':{lat:23.7,lng:90.4,iso:'bd'}, '斯里兰卡':{lat:7.9,lng:80.8,iso:'lk'}, '尼泊尔':{lat:28.4,lng:84.1,iso:'np'},
+  '澳大利亚':{lat:-25.3,lng:133.8,iso:'au'}, '新西兰':{lat:-41,lng:174,iso:'nz'},
+  '美国':{lat:39.8,lng:-98.6,iso:'us'}, '加拿大':{lat:56.1,lng:-106.3,iso:'ca'}, '墨西哥':{lat:23.6,lng:-102.5,iso:'mx'},
+  '巴西':{lat:-10,lng:-52,iso:'br'}, '阿根廷':{lat:-34,lng:-64,iso:'ar'}, '智利':{lat:-35.7,lng:-71.5,iso:'cl'}, '秘鲁':{lat:-9.2,lng:-75,iso:'pe'},
+  '哥伦比亚':{lat:4.6,lng:-74.3,iso:'co'}, '委内瑞拉':{lat:8,lng:-66,iso:'ve'},
+  '英国':{lat:54,lng:-2,iso:'gb'}, '爱尔兰':{lat:53.4,lng:-8,iso:'ie'}, '法国':{lat:46.6,lng:2.2,iso:'fr'}, '德国':{lat:51.2,lng:10.4,iso:'de'},
+  '荷兰':{lat:52.1,lng:5.3,iso:'nl'}, '比利时':{lat:50.5,lng:4.5,iso:'be'}, '瑞士':{lat:46.8,lng:8.2,iso:'ch'}, '意大利':{lat:42.8,lng:12.8,iso:'it'},
+  '西班牙':{lat:40,lng:-3.7,iso:'es'}, '葡萄牙':{lat:39.4,lng:-8,iso:'pt'}, '瑞典':{lat:60.1,lng:18.6,iso:'se'}, '挪威':{lat:60.5,lng:8.5,iso:'no'},
+  '丹麦':{lat:56.3,lng:9.5,iso:'dk'}, '芬兰':{lat:61.9,lng:25.7,iso:'fi'}, '波兰':{lat:51.9,lng:19.1,iso:'pl'}, '俄罗斯':{lat:61.5,lng:105.3,iso:'ru'},
+  '乌克兰':{lat:48.4,lng:31.2,iso:'ua'}, '希腊':{lat:39.1,lng:21.8,iso:'gr'}, '奥地利':{lat:47.5,lng:14.6,iso:'at'}, '捷克':{lat:49.8,lng:15.5,iso:'cz'},
+  '土耳其':{lat:38.9,lng:35.2,iso:'tr'},
+  '沙特阿拉伯':{lat:24,lng:45,iso:'sa'}, '阿联酋':{lat:24,lng:54,iso:'ae'}, '卡塔尔':{lat:25.3,lng:51.2,iso:'qa'}, '以色列':{lat:31,lng:35,iso:'il'},
+  '埃及':{lat:26.8,lng:30.8,iso:'eg'}, '南非':{lat:-29,lng:24.7,iso:'za'}, '尼日利亚':{lat:9.1,lng:8.7,iso:'ng'}, '肯尼亚':{lat:-0.02,lng:37.9,iso:'ke'},
+};
+const COUNTRY_ALIASES = {
+  'china':'中国','malaysia':'马来西亚','singapore':'新加坡','indonesia':'印度尼西亚','thailand':'泰国',
+  'philippines':'菲律宾','vietnam':'越南','myanmar':'缅甸','cambodia':'柬埔寨','laos':'老挝','brunei':'文莱',
+  'japan':'日本','south korea':'韩国','korea':'韩国','mongolia':'蒙古','india':'印度','pakistan':'巴基斯坦',
+  'bangladesh':'孟加拉','sri lanka':'斯里兰卡','nepal':'尼泊尔','australia':'澳大利亚','new zealand':'新西兰',
+  'usa':'美国','united states':'美国','us':'美国','america':'美国','canada':'加拿大','mexico':'墨西哥',
+  'brazil':'巴西','argentina':'阿根廷','chile':'智利','peru':'秘鲁','colombia':'哥伦比亚','venezuela':'委内瑞拉',
+  'uk':'英国','united kingdom':'英国','britain':'英国','england':'英国','ireland':'爱尔兰','france':'法国',
+  'germany':'德国','netherlands':'荷兰','belgium':'比利时','switzerland':'瑞士','italy':'意大利','spain':'西班牙',
+  'portugal':'葡萄牙','sweden':'瑞典','norway':'挪威','denmark':'丹麦','finland':'芬兰','poland':'波兰',
+  'russia':'俄罗斯','ukraine':'乌克兰','greece':'希腊','austria':'奥地利','czech republic':'捷克','turkey':'土耳其',
+  'saudi arabia':'沙特阿拉伯','uae':'阿联酋','qatar':'卡塔尔','israel':'以色列','egypt':'埃及','south africa':'南非',
+  'nigeria':'尼日利亚','kenya':'肯尼亚','hong kong':'香港','macau':'澳门','taiwan':'台湾',
+};
+function lookupCountryCoords(name){
+  if(!name) return null;
+  const trimmed = name.trim();
+  if(COUNTRY_COORDS[trimmed]) return {name:trimmed, ...COUNTRY_COORDS[trimmed]};
+  const alias = COUNTRY_ALIASES[trimmed.toLowerCase()];
+  if(alias && COUNTRY_COORDS[alias]) return {name:alias, ...COUNTRY_COORDS[alias]};
+  return null;
+}
+
+/* ============ State ============ */
+let people = [];
+let trees = DEFAULT_TREES.slice();
+let currentTreeId = 'main';
+let selectedId = null;
+let dragState = null; // active pointer-based drag-to-reorder state
+let undoStack = [];
+const MAX_UNDO = 30;
+function pushHistory(){
+  try{
+    undoStack.push(JSON.stringify({people, trees, currentTreeId}));
+    if(undoStack.length>MAX_UNDO) undoStack.shift();
+  }catch(e){}
+  updateUndoButton();
+}
+function undo(){
+  if(undoStack.length===0){ toast('没有可撤销的操作了'); return; }
+  const snapshot = JSON.parse(undoStack.pop());
+  people = snapshot.people;
+  trees = snapshot.trees;
+  currentTreeId = snapshot.currentTreeId;
+  selectedId = null;
+  focusPersonId = null;
+  saveData();
+  renderTreeSelect();
+  render();
+  renderSidePanel();
+  updateUndoButton();
+  toast('已撤销上一步操作');
+}
+function updateUndoButton(){
+  const btn = document.getElementById('undoBtn');
+  if(btn) btn.disabled = undoStack.length===0;
+}
+let editingId = null;
+let zoom = 1;
+let pan = {x:0, y:0};
+let panState = null;
+let lastColumnIndex = {}; // id -> {level, col} snapshot from the most recent render, used to
+                          // decide whether two parents sit adjacent to each other on screen
+let focusPersonId = null; // when set, only this person's family (within the gen limits below) shows
+let focusUpGen = 2;       // how many generations of ancestors to include
+let focusDownGen = 2;     // how many generations of descendants to include
+let currentFocusSet = null; // recomputed each render() from the above
+
+function uid(){ return 'p_' + Math.random().toString(36).slice(2,10); }
+
+function personById(id){ return people.find(p=>p.id===id); }
+function childrenOf(id){
+  return people.filter(p => p.parents && p.parents.includes(id));
+}
+function initials(name){
+  if(!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if(parts.length===1) return parts[0].slice(0,1);
+  return parts[0].slice(0,1)+parts[parts.length-1].slice(0,1);
+}
+function yearsLabel(p){
+  if(!p.birth && !p.death) return '';
+  const base = (p.birth||'?') + ' – ' + (p.death||'今');
+  const b = parseInt(p.birth, 10), d = parseInt(p.death, 10);
+  if(p.birth && p.death && !isNaN(b) && !isNaN(d) && d>=b){
+    return `${base}（享年${d-b}岁）`;
+  }
+  return base;
+}
+
+/* ============ Image resize ============ */
+function resizeImageToBlob(file, maxDim=220){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w=img.width, h=img.height;
+        if(w>h){ if(w>maxDim){ h*=maxDim/w; w=maxDim; } }
+        else{ if(h>maxDim){ w*=maxDim/h; h=maxDim; } }
+        const canvas = document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        canvas.toBlob(blob=>{
+          if(blob) resolve(blob); else reject(new Error('生成图片失败'));
+        }, 'image/jpeg', 0.85);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ============ Photo storage (IndexedDB) ============ */
+// Photos live in IndexedDB (not localStorage/window.storage) since they're
+// binary and can be large — localStorage/window.storage have tiny (5-10MB)
+// quotas that base64 photos would blow through fast. Only a small photoId
+// reference is kept on each person in the regular JSON data.
+const PHOTO_DB_NAME = 'family-tree-photos-db';
+const PHOTO_STORE = 'photos';
+let photoDBPromise = null;
+function openPhotoDB(){
+  if(photoDBPromise) return photoDBPromise;
+  photoDBPromise = new Promise((resolve, reject)=>{
+    if(typeof indexedDB==='undefined'){ reject(new Error('IndexedDB not available')); return; }
+    const req = indexedDB.open(PHOTO_DB_NAME, 1);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      if(!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
+    };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+  return photoDBPromise;
+}
+async function putPhotoBlob(photoId, blob){
+  const db = await openPhotoDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readwrite');
+    tx.objectStore(PHOTO_STORE).put(blob, photoId);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function getPhotoBlob(photoId){
+  const db = await openPhotoDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readonly');
+    const req = tx.objectStore(PHOTO_STORE).get(photoId);
+    req.onsuccess = ()=>resolve(req.result || null);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+async function deletePhotoBlob(photoId){
+  const db = await openPhotoDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readwrite');
+    tx.objectStore(PHOTO_STORE).delete(photoId);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function getAllPhotoEntries(){
+  const db = await openPhotoDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readonly');
+    const store = tx.objectStore(PHOTO_STORE);
+    const entries = [];
+    const req = store.openCursor();
+    req.onsuccess = (e)=>{
+      const cursor = e.target.result;
+      if(cursor){ entries.push([cursor.key, cursor.value]); cursor.continue(); }
+      else resolve(entries);
+    };
+    req.onerror = ()=>reject(req.error);
+  });
+}
+
+let photoCache = {}; // photoId -> object URL, populated at startup
+function photoSrc(p){
+  return (p && p.photoId && photoCache[p.photoId]) || null;
+}
+async function loadAllPhotosIntoCache(){
+  try{
+    const entries = await getAllPhotoEntries();
+    entries.forEach(([id, blob])=>{
+      try{ photoCache[id] = URL.createObjectURL(blob); }catch(e){}
+    });
+  }catch(e){ console.error('加载照片失败', e); }
+}
+function dataURLToBlob(dataUrl){
+  const parts = dataUrl.split(',');
+  const mimeMatch = parts[0].match(/data:(.*?);base64/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const bin = atob(parts[1]);
+  const arr = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], {type: mime});
+}
+async function migrateLegacyPhotos(){
+  let migrated = 0;
+  for(const p of people){
+    if(p.photo && !p.photoId){
+      try{
+        const blob = dataURLToBlob(p.photo);
+        const photoId = uid();
+        await putPhotoBlob(photoId, blob);
+        photoCache[photoId] = URL.createObjectURL(blob);
+        p.photoId = photoId;
+        delete p.photo;
+        migrated++;
+      }catch(e){ console.error('迁移照片失败', e); }
+    }
+  }
+  if(migrated>0) saveData();
+  return migrated;
+}
+
+/* ============ Toast ============ */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ============ Tree layout & render ============ */
+function isEffectivelyHidden(id, visited){
+  visited = visited || new Set();
+  if(visited.has(id)) return false; // cycle guard
+  visited.add(id);
+  const p = personById(id);
+  if(!p) return true;
+  if(p.hidden) return true;
+  // hidden because a parent is collapsed, or a parent is itself (transitively) hidden
+  const viaParent = (p.parents||[]).some(pid=>{
+    const par = personById(pid);
+    if(!par) return false;
+    if(par.collapsed) return true;
+    return isEffectivelyHidden(pid, visited);
+  });
+  if(viaParent) return true;
+  // A spouse whose relevance to THIS tree comes entirely from the marriage
+  // link — either because they have no recorded parents of their own, or
+  // because they're a bridge person from a different family tree (their own
+  // ancestry, if any, belongs to that other tree and isn't part of this
+  // view) — inherits a hidden state once none of their spousal connections
+  // into this view remain visible. Without this they'd stay drawn but
+  // orphaned, with no valid anchor for their row position.
+  const isBridge = (p.treeId||'main') !== currentTreeId;
+  if(((!p.parents || p.parents.length===0) || isBridge) && p.spouses && p.spouses.length){
+    return p.spouses.every(sid=> !visited.has(sid) && isEffectivelyHidden(sid, visited));
+  }
+  return false;
+}
+let focusSidewaysLevels = new Set(); // which ancestor "distances" (0=本人, 1=父母那代, 2=祖父母那代…) have sideways relatives expanded
+
+function collectSiblingsAndDescendants(id, depthDown, set){
+  const p = personById(id);
+  if(!p) return;
+  const parentIds = (p.parents||[]).filter(pid=>personById(pid));
+  parentIds.forEach(pid=>{
+    // Make sure the shared parent is part of the focus set too — otherwise,
+    // when this anchor person is already at the outer edge of the "up"
+    // depth, their parent (one generation further) wouldn't be included,
+    // and any siblings we pull in below would have no visible parent to
+    // attach to. They'd fall back to being treated as disconnected roots
+    // (shown floating at the very top with no connecting line).
+    set.add(pid);
+    childrenOf(pid).forEach(sib=>{
+      if(sib.id===id || set.has(sib.id)) return;
+      set.add(sib.id);
+      (sib.spouses||[]).forEach(sid=>{ if(personById(sid)) set.add(sid); });
+      let frontier = [sib.id];
+      for(let g=0; g<depthDown && frontier.length; g++){
+        const next = [];
+        frontier.forEach(fid=>{
+          childrenOf(fid).forEach(c=>{
+            if(!set.has(c.id)){
+              set.add(c.id);
+              (c.spouses||[]).forEach(csid=>{ if(personById(csid)) set.add(csid); });
+              next.push(c.id);
+            }
+          });
+        });
+        frontier = next;
+      }
+    });
+  });
+}
+
+function computeFocusSet(){
+  if(!focusPersonId || !personById(focusPersonId)) return null; // null = no restriction
+  const set = new Set([focusPersonId]);
+
+  // ancestors — both parents at each generation come along naturally via
+  // the .parents array, so no extra spouse step is needed here (adding one
+  // would also pull in an ancestor's OTHER unrelated spouses/branches)
+  let frontier = [focusPersonId];
+  let distance = 0;
+  const ancestorDistance = {}; // id -> generations above the focus person
+  for(let g=0; g<focusUpGen && frontier.length; g++){
+    distance = g+1;
+    const next = [];
+    frontier.forEach(id=>{
+      const p = personById(id);
+      (p && p.parents || []).forEach(pid=>{
+        if(personById(pid) && !set.has(pid)){
+          set.add(pid); next.push(pid);
+          ancestorDistance[pid] = distance;
+        }
+      });
+    });
+    frontier = next;
+  }
+
+  // descendants
+  const descendantIds = new Set();
+  frontier = [focusPersonId];
+  for(let g=0; g<focusDownGen && frontier.length; g++){
+    const next = [];
+    frontier.forEach(id=>{
+      childrenOf(id).forEach(c=>{
+        if(!set.has(c.id)){ set.add(c.id); descendantIds.add(c.id); next.push(c.id); }
+      });
+    });
+    frontier = next;
+  }
+
+  // include spouses of the focus person themself and of every descendant
+  // (sons/daughters-in-law belong in a "family view"), but deliberately not
+  // of ancestors, so an ancestor's other unrelated marriages stay out of view
+  [focusPersonId, ...descendantIds].forEach(id=>{
+    const p = personById(id);
+    (p && p.spouses || []).forEach(sid=>{ if(personById(sid)) set.add(sid); });
+  });
+
+  // sideways: siblings (and nieces/nephews/cousins) at every generation —
+  // the focus person's own siblings get descendants down to focusDownGen
+  // (matching their own descendant depth); an ancestor N generations up
+  // gets their siblings' descendants traced back down to the focus
+  // person's own generation, so first cousins line up at the right row.
+  // sideways: siblings (and nieces/nephews/cousins), independently
+  // toggleable per generation distance — distance 0 is the focus person's
+  // own siblings (their descendants traced down to focusDownGen), distance
+  // N is that generation's ancestor's siblings (traced back down to the
+  // focus person's own row, so first cousins line up correctly).
+  if(focusSidewaysLevels.has(0)){
+    collectSiblingsAndDescendants(focusPersonId, focusDownGen, set);
+  }
+  Object.keys(ancestorDistance).forEach(id=>{
+    const d = ancestorDistance[id];
+    if(focusSidewaysLevels.has(d)){
+      collectSiblingsAndDescendants(id, d, set);
+    }
+  });
+
+  return set;
+}
+let currentTreeMembers = null; // Set of ids belonging to (or bridging into) currentTreeId, recomputed each render()
+
+function computeTreeMembership(targetTreeId){
+  const member = new Set();
+  people.forEach(p=>{ if((p.treeId||'main')===targetTreeId) member.add(p.id); });
+  // Repeatedly expand via marriage bridges and downward-through-children
+  // descent until nothing new is added. Doing this as a fixed-point over the
+  // whole population (rather than a single recursive walk per person) means
+  // the result never depends on which order people happen to be checked in
+  // — e.g. a step-daughter who only belongs here via her step-father will
+  // correctly pull her own husband in too, regardless of which one gets
+  // resolved "first".
+  let changed = true;
+  while(changed){
+    changed = false;
+    people.forEach(p=>{
+      if(member.has(p.id)) return;
+      const spouseIn = (p.spouses||[]).some(sid=>member.has(sid));
+      if(spouseIn){ member.add(p.id); changed=true; return; }
+      const parentIn = (p.parents||[]).some(pid=>member.has(pid));
+      if(parentIn){ member.add(p.id); changed=true; }
+    });
+  }
+  return member;
+}
+function isVisible(id){
+  if(isEffectivelyHidden(id)) return false;
+  if(currentFocusSet){
+    // Focus mode already computed exactly who's relevant (both sides of
+    // ancestry, descendants, optionally siblings/cousins) regardless of
+    // which family tree they happen to be tagged under — so skip the tree
+    // membership filter here, otherwise a grandparent whose side was
+    // organized into a separate tree would silently disappear even though
+    // focus mode explicitly asked to include them.
+    return currentFocusSet.has(id);
+  }
+  if(!currentTreeMembers) return true;
+  return currentTreeMembers.has(id);
+}
+function isBridgePerson(id){
+  const p = personById(id);
+  if(!p) return false;
+  return (p.treeId||'main')!==currentTreeId;
+}
+function visiblePeople(){
+  return people.filter(p=>isVisible(p.id));
+}
+function toggleCollapse(id){
+  pushHistory();
+  const p = personById(id);
+  if(!p) return;
+  p.collapsed = !p.collapsed;
+  saveData();
+  render();
+  renderSidePanel();
+}
+function reorderRow(row, draggedIds, targetIds){
+  pushHistory();
+  const remaining = row.filter(id=>!draggedIds.includes(id));
+  const targetIdx = remaining.indexOf(targetIds[0]);
+  const insertAt = targetIdx>=0 ? targetIdx : remaining.length;
+  const newRow = remaining.slice(0,insertAt).concat(draggedIds, remaining.slice(insertAt));
+  newRow.forEach((id,idx)=>{
+    const p = personById(id);
+    if(p){
+      p.orderHints = p.orderHints || {};
+      p.orderHints[currentTreeId] = idx*10;
+    }
+  });
+  // Clear any manual order overrides on this row's descendants (in the
+  // current tree) so they re-anchor cleanly under their parents' new
+  // positions instead of keeping stale positions that no longer line up —
+  // that mismatch is what causes connector lines to cross and tangle.
+  const toClear = new Set();
+  newRow.forEach(id=> collectDescendants(id, toClear));
+  toClear.forEach(id=>{
+    const p = personById(id);
+    if(p && p.orderHints) delete p.orderHints[currentTreeId];
+  });
+  saveData();
+  render();
+  renderSidePanel();
+  toast('已调整顺序');
+}
+function centerTree(){
+  requestAnimationFrame(()=>{
+    const wrap = document.getElementById('canvasWrap');
+    const canvas = document.getElementById('canvas');
+    if(!wrap || !canvas || canvas.style.display==='none') return;
+    const wrapRect = wrap.getBoundingClientRect();
+    const contentWidth = canvas.scrollWidth * zoom;
+    pan.x = (wrapRect.width - contentWidth) / 2;
+    pan.y = 30;
+    applyTransform();
+  });
+}
+
+function computeLevels(){
+  const level = {};
+
+  // Normal forward computation through recorded blood-parent chains.
+  // Anyone with no recorded parents defaults to level 0 for now — that's
+  // correct for the tree's actual top-level ancestors, but wrong for e.g.
+  // an in-law parent whose own ancestry was simply never entered. The
+  // refinement loop below corrects those cases afterward.
+  function getLevel(id, guard){
+    if(level[id]!==undefined) return level[id];
+    if(guard.has(id)) return 0; // cycle guard
+    guard.add(id);
+    const p = personById(id);
+    const validParents = (p && p.parents ? p.parents : []).filter(pid=>isVisible(pid));
+    if(!p || validParents.length===0){ level[id]=0; return 0; }
+    let m = 0;
+    validParents.forEach(pid=>{ m = Math.max(m, getLevel(pid, guard)+1); });
+    level[id]=m;
+    return m;
+  }
+  visiblePeople().forEach(p=> getLevel(p.id, new Set()));
+
+  const hasKnownAncestry = id=>{
+    const p = personById(id);
+    return p && p.parents && p.parents.filter(pid=>isVisible(pid)).length>0;
+  };
+
+  // Refine: keep syncing spouse levels together, and let anyone with no
+  // known ancestry of their own (in-laws) borrow a generation from their
+  // children where that suggests they sit deeper than the level-0 default.
+  // Only ever moves people DOWN the tree (higher level number), never up,
+  // so this converges — an in-law's whole unresolved ancestor chain (their
+  // own parents, grandparents, etc, if entered) cascades into place one
+  // generation at a time as their nearest resolved descendant settles.
+  let changed = true, iter = 0;
+  while(changed && iter<40){
+    changed = false; iter++;
+
+    // Rule A: anyone with recorded parents should sit at least one level
+    // below the deepest of them. Re-applied every iteration (not just once)
+    // so that when an in-law parent's own level gets corrected below, their
+    // OTHER children (e.g. a spouse's sibling) get pulled down to match too,
+    // instead of staying stuck at whatever level was computed before the
+    // parent was corrected.
+    visiblePeople().forEach(p=>{
+      const validParents = (p.parents||[]).filter(pid=>isVisible(pid));
+      if(validParents.length){
+        const m = Math.max(...validParents.map(pid=>level[pid])) + 1;
+        if(m>level[p.id]){ level[p.id]=m; changed=true; }
+      }
+    });
+
+    // Rule B: keep spouse levels in sync with each other.
+    visiblePeople().forEach(p=>{
+      (p.spouses||[]).filter(isVisible).forEach(sid=>{
+        if(level[sid]!==level[p.id]){
+          const m = Math.max(level[sid], level[p.id]);
+          if(level[p.id]!==m){ level[p.id]=m; changed=true; }
+          if(level[sid]!==m){ level[sid]=m; changed=true; }
+        }
+      });
+    });
+
+    // Rule C: anyone with no ancestry of their own (in-laws) borrows a
+    // generation from their children where that suggests they sit deeper
+    // than the level-0 default.
+    visiblePeople().forEach(p=>{
+      if(hasKnownAncestry(p.id)) return;
+      const kids = childrenOf(p.id).filter(c=>isVisible(c.id));
+      if(kids.length){
+        const suggestion = Math.max(...kids.map(c=>level[c.id])) - 1;
+        if(suggestion>level[p.id]){ level[p.id]=suggestion; changed=true; }
+      }
+    });
+  }
+
+  return level;
+}
+
+function orderPeople(level){
+  const visible = visiblePeople();
+  const maxLevel = Math.max(0, ...Object.values(level));
+  const rows = [];
+  for(let l=0;l<=maxLevel;l++) rows.push([]);
+  const placed = new Set();
+
+  // seed roots (level 0), sorted by manual orderHint where set, otherwise original insertion order
+  const roots = visible.filter(p=>level[p.id]===0);
+  roots.sort((a,b)=>{
+    const ah = a.orderHints && a.orderHints[currentTreeId];
+    const bh = b.orderHints && b.orderHints[currentTreeId];
+    const av = ah!==undefined ? ah : roots.indexOf(a)*10;
+    const bv = bh!==undefined ? bh : roots.indexOf(b)*10;
+    return av-bv;
+  });
+  roots.forEach(p=>{
+    if(placed.has(p.id)) return;
+    rows[0].push(p.id); placed.add(p.id);
+    (p.spouses||[]).filter(isVisible).forEach(sid=>{
+      if(!placed.has(sid) && level[sid]===0){ rows[0].push(sid); placed.add(sid); }
+    });
+  });
+  // any remaining unplaced roots (isolated)
+  visible.filter(p=>level[p.id]===0 && !placed.has(p.id)).forEach(p=>{ rows[0].push(p.id); placed.add(p.id); });
+
+  for(let l=0; l<maxLevel; l++){
+    // Group not-yet-placed children by the average column position of their
+    // parent(s) within row[l] (rather than scanning parent-by-parent in turn).
+    // This matters for polygamous / multi-spouse setups: a shared parent (e.g.
+    // a husband with several wives) must not "claim" all children from every
+    // wife on his own single turn — each child should sort in next to its
+    // actual mother's column, not wherever the shared parent happens to sit.
+    const rowIndex = {};
+    rows[l].forEach((pid, idx)=>{ rowIndex[pid] = idx; });
+
+    const candidates = visible.filter(p=>{
+      if(level[p.id]!==l+1 || placed.has(p.id)) return false;
+      return (p.parents||[]).some(pid=>rowIndex[pid]!==undefined);
+    });
+
+    const withAnchor = candidates.map(c=>{
+      const idxs = (c.parents||[]).filter(pid=>rowIndex[pid]!==undefined).map(pid=>rowIndex[pid]);
+      const anchor = idxs.reduce((a,b)=>a+b,0) / idxs.length;
+      return {c, anchor};
+    });
+    withAnchor.sort((a,b)=>{
+      const ah = a.c.orderHints && a.c.orderHints[currentTreeId];
+      const bh = b.c.orderHints && b.c.orderHints[currentTreeId];
+      const av = ah!==undefined ? ah : a.anchor*10;
+      const bv = bh!==undefined ? bh : b.anchor*10;
+      return av-bv;
+    });
+
+    withAnchor.forEach(({c})=>{
+      if(placed.has(c.id)) return;
+      rows[l+1].push(c.id); placed.add(c.id);
+      (c.spouses||[]).filter(isVisible).forEach(sid=>{
+        if(!placed.has(sid) && level[sid]===l+1){ rows[l+1].push(sid); placed.add(sid); }
+      });
+    });
+
+    // any unplaced at this level (no linked parent already placed) appended
+    visible.filter(p=>level[p.id]===l+1 && !placed.has(p.id)).forEach(p=>{ rows[l+1].push(p.id); placed.add(p.id); });
+  }
+  return rows;
+}
+
+function render(){
+  const canvas = document.getElementById('canvas');
+  const emptyState = document.getElementById('emptyState');
+  canvas.innerHTML = '';
+  updateHiddenBadge();
+  currentTreeMembers = computeTreeMembership(currentTreeId);
+  currentFocusSet = computeFocusSet();
+  updateFocusBar();
+
+  const visCount = visiblePeople().length;
+
+  if(people.length===0){
+    emptyState.querySelector('h2').textContent = '还没有家庭成员';
+    emptyState.querySelector('p').textContent = '从添加第一位成员开始 —— 可以是你自己，或者家族里最年长的长辈。之后可以为TA添加配偶、子女和父母。';
+    document.getElementById('emptyAddBtn').style.display = 'inline-flex';
+    emptyState.style.display='flex';
+    canvas.style.display='none';
+    return;
+  }
+  if(visCount===0){
+    emptyState.style.display='flex';
+    emptyState.querySelector('h2').textContent = '所有成员都已被隐藏';
+    emptyState.querySelector('p').textContent = '点击右上角"隐藏的成员"可以重新显示他们。';
+    document.getElementById('emptyAddBtn').style.display='none';
+    canvas.style.display='none';
+    return;
+  }
+  emptyState.style.display='none';
+  canvas.style.display='block';
+
+  const level = computeLevels();
+  const rows = orderPeople(level);
+
+  lastColumnIndex = {};
+  rows.forEach((row, li)=>{
+    row.forEach((pid, ci)=>{ lastColumnIndex[pid] = {level: li, col: ci}; });
+  });
+
+  const measuredX = {}; // id -> actual rendered center-X (px, relative to canvas), filled in row by row
+
+  rows.forEach((row, li)=>{
+    const rowEl = document.createElement('div');
+    rowEl.className='gen-row';
+    rowEl.dataset.level = li;
+    const genLabel = document.createElement('div');
+    genLabel.className = 'gen-label';
+    genLabel.textContent = `第 ${li+1} 代`;
+    rowEl.appendChild(genLabel);
+    canvas.appendChild(rowEl); // append early so we can measure real positions as we go
+
+    let i=0;
+    while(i<row.length){
+      // Grow a contiguous run of mutually-linked spouses starting at i (not
+      // just pairs — a person with several spouses who all sit adjacent, e.g.
+      // a polygamous marriage, gets merged into one combined card group).
+      const run = [personById(row[i])];
+      let j = i+1;
+      while(j<row.length){
+        const candidate = personById(row[j]);
+        const linked = run.some(m=> m.spouses && m.spouses.includes(candidate.id));
+        if(!linked) break;
+        run.push(candidate);
+        j++;
+      }
+
+      let el;
+      if(run.length>1){
+        el = makeCoupleCard(run);
+      } else {
+        el = document.createElement('div');
+        el.className='unit';
+        el.appendChild(makeCard(run[0]));
+      }
+      rowEl.appendChild(el);
+
+      // Manual drag-to-reorder: press and drag this run left/right within
+      // its own row to override the automatic ordering. Built on pointer
+      // events (not the native HTML5 drag API) so it works reliably on
+      // touch devices and inside the panned/zoomed canvas — native drag
+      // events are unreliable once a CSS transform/scale is involved.
+      const runIds = run.map(m=>m.id);
+      el.classList.add('draggable-unit');
+      el.dataset.runIds = runIds.join(',');
+      el.addEventListener('pointerdown', (e)=>{
+        if(e.target.closest('.collapse-toggle') || e.target.closest('.bridge-badge') || e.target.closest('.cname') || e.target.closest('.card-tooltip')) return;
+        if(e.button!==undefined && e.button!==0) return;
+        dragState = { runIds, row, startX:e.clientX, startY:e.clientY, el, moved:false, pointerId:e.pointerId };
+      });
+      el.addEventListener('pointermove', (e)=>{
+        if(!dragState || dragState.el!==el) return;
+        const dx = e.clientX-dragState.startX, dy = e.clientY-dragState.startY;
+        if(!dragState.moved && Math.hypot(dx,dy)>8){
+          dragState.moved = true;
+          el.classList.add('dragging');
+          try{ el.setPointerCapture(dragState.pointerId); }catch(err){}
+        }
+        if(dragState.moved){
+          document.querySelectorAll('.draggable-unit.drag-over').forEach(x=>x.classList.remove('drag-over'));
+          const under = document.elementFromPoint(e.clientX, e.clientY);
+          const targetUnit = under && under.closest && under.closest('.draggable-unit');
+          if(targetUnit && targetUnit!==el) targetUnit.classList.add('drag-over');
+        }
+      });
+      el.addEventListener('pointerup', (e)=>{
+        if(!dragState || dragState.el!==el) return;
+        try{ el.releasePointerCapture(dragState.pointerId); }catch(err){}
+        const wasMoved = dragState.moved;
+        document.querySelectorAll('.draggable-unit.drag-over').forEach(x=>x.classList.remove('drag-over'));
+        el.classList.remove('dragging');
+        if(wasMoved){
+          const under = document.elementFromPoint(e.clientX, e.clientY);
+          const targetUnit = under && under.closest && under.closest('.draggable-unit');
+          if(targetUnit && targetUnit!==el && targetUnit.dataset.runIds){
+            reorderRow(dragState.row, dragState.runIds, targetUnit.dataset.runIds.split(','));
+          }
+        }
+        dragState = null;
+      });
+      el.addEventListener('pointercancel', ()=>{
+        if(dragState && dragState.el===el){ el.classList.remove('dragging'); dragState=null; }
+      });
+
+      // Try to line this run up under its parent(s) — but only by pushing it
+      // to the right into open space, never by squeezing left over a sibling
+      // that's already placed (i.e. only when the row isn't "full" yet there).
+      if(li>0){
+        const parentXs = [];
+        run.forEach(m=>{ (m.parents||[]).forEach(pid=>{ if(measuredX[pid]!==undefined) parentXs.push(measuredX[pid]); }); });
+        if(parentXs.length){
+          const canvasRect = canvas.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          const naturalCenter = (elRect.left - canvasRect.left) + elRect.width/2;
+          const desiredCenter = parentXs.reduce((a,b)=>a+b,0)/parentXs.length;
+          const shift = (desiredCenter - naturalCenter) / zoom;
+          if(shift>0) el.style.marginLeft = shift + 'px';
+        }
+      }
+
+      // record each member's actual final position for the next row to align against
+      const canvasRect2 = canvas.getBoundingClientRect();
+      run.forEach(m=>{
+        const cardEl = el.querySelector('.card[data-id="'+m.id+'"]');
+        if(cardEl){
+          const cr = cardEl.getBoundingClientRect();
+          measuredX[m.id] = (cr.left - canvasRect2.left) + cr.width/2;
+        }
+      });
+
+      i = j;
+    }
+  });
+
+  // draw connectors after layout paints
+  requestAnimationFrame(drawConnectors);
+}
+
+function makeCoupleCard(members){
+  const wrap = document.createElement('div');
+  wrap.className = 'couple-card';
+  members.forEach(m=>{
+    wrap.appendChild(makeCard(m, true));
+  });
+  return wrap;
+}
+
+function makeCard(p){
+  const card = document.createElement('div');
+  const genderClass = p.gender==='F' ? 'gender-f' : (p.gender==='M' ? 'gender-m' : 'gender-o');
+  const bridge = isBridgePerson(p.id);
+  card.className = 'card ' + genderClass + (p.id===selectedId ? ' selected':'') + (bridge ? ' bridge-card':'');
+  card.dataset.id = p.id;
+  const avatarInner = photoSrc(p) ? `<img src="${photoSrc(p)}" alt="">` : initials(p.name);
+  const kidCount = childrenOf(p.id).length;
+  const collapseBtn = kidCount>0 ? `
+    <button class="collapse-toggle ${p.collapsed?'is-collapsed':''}" title="${p.collapsed ? '展开下一代' : '收起下一代'}" data-collapse="${p.id}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${p.collapsed ? '<path d="M12 5v14M5 12h14"/>' : '<path d="M5 12h14"/>'}</svg>
+      ${p.collapsed ? `<span class="collapse-count">${kidCount}</span>` : ''}
+    </button>` : '';
+  const bridgeBadge = bridge ? `<div class="bridge-badge" data-goto-tree="${p.id}" title="属于另一棵家族树，点击前往查看">🔗 ${escapeHtml((trees.find(t=>t.id===(p.treeId||'main'))||{}).name||'其他家族')}</div>` : '';
+  card.innerHTML = `
+    ${collapseBtn}
+    <div class="avatar">${avatarInner}</div>
+    <div class="cname">${escapeHtml(p.name)}</div>
+    <div class="cyears">${yearsLabel(p)}</div>
+    ${bridgeBadge}
+    ${p.notes ? `<div class="card-tooltip">${escapeHtml(p.notes)}</div>` : ''}
+  `;
+  card.addEventListener('click', ()=>selectPerson(p.id));
+  const bridgeEl = card.querySelector('.bridge-badge');
+  if(bridgeEl){
+    bridgeEl.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      goToBridgePerson(p.id);
+    });
+  }
+  const cbtn = card.querySelector('.collapse-toggle');
+  if(cbtn){
+    cbtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      toggleCollapse(p.id);
+    });
+  }
+  const nameEl = card.querySelector('.cname');
+  if(nameEl){
+    nameEl.title = '点击姓名聚焦查看此人的家庭';
+    nameEl.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      enterFocus(p.id);
+    });
+  }
+  return card;
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function drawConnectors(){
+  const canvas = document.getElementById('canvas');
+  const old = canvas.querySelector('svg.connectors');
+  if(old) old.remove();
+  const canvasRect = canvas.getBoundingClientRect();
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg');
+  svg.setAttribute('class','connectors');
+  svg.setAttribute('width', canvas.scrollWidth);
+  svg.setAttribute('height', canvas.scrollHeight);
+
+  function cardRect(id){
+    const el = canvas.querySelector('.card[data-id="'+id+'"]');
+    if(!el) return null;
+    const r = el.getBoundingClientRect();
+    // r is already scaled by the canvas's own CSS transform (scale(zoom)).
+    // This svg lives inside that same transformed canvas, so it will be
+    // scaled by zoom too — dividing by zoom here undoes the one already
+    // baked into getBoundingClientRect, so the net scaling applied ends up
+    // happening exactly once (matching the cards) instead of twice.
+    return {
+      cx: (r.left - canvasRect.left + r.width/2) / zoom,
+      top: (r.top - canvasRect.top) / zoom,
+      bottom: (r.bottom - canvasRect.top) / zoom,
+      width: r.width / zoom
+    };
+  }
+
+  // marriage lines
+  const drawnPairs = new Set();
+  visiblePeople().forEach(p=>{
+    (p.spouses||[]).filter(isVisible).forEach(sid=>{
+      const key = [p.id,sid].sort().join('|');
+      if(drawnPairs.has(key)) return;
+      drawnPairs.add(key);
+      const elA = canvas.querySelector('.card[data-id="'+p.id+'"]');
+      const elB = canvas.querySelector('.card[data-id="'+sid+'"]');
+      if(elA && elB && elA.parentElement===elB.parentElement && elA.parentElement.classList.contains('couple-card')){
+        return; // already visually joined into one merged card, no need for a duplicate line
+      }
+      const a = cardRect(p.id), b = cardRect(sid);
+      if(!a||!b) return;
+      const y = (a.top+a.bottom)/2;
+      const path = document.createElementNS(svgNS,'path');
+      path.setAttribute('d', `M ${a.cx+a.width/2-4} ${y} L ${b.cx-b.width/2+4} ${y}`);
+      path.setAttribute('stroke', 'var(--accent-2)');
+      path.setAttribute('stroke-width','2.5');
+      path.setAttribute('fill','none');
+      svg.appendChild(path);
+    });
+  });
+
+  // parent-child connectors — collect first, draw after, so we can rank
+  // lines feeding into the SAME target row by horizontal position and
+  // spread their elbow heights out evenly. (Using a hash for this instead
+  // can coincidentally give two nearby-but-unrelated family groups almost
+  // the same bend height, making their lines look like they cross or join
+  // in empty space between unrelated cards.)
+  const connectorJobs = [];
+  visiblePeople().forEach(child=>{
+    if(!child.parents || child.parents.length===0) return;
+    const validParents = child.parents.filter(pid=>isVisible(pid));
+    if(validParents.length===0) return;
+
+    // Group parents into clusters of people who actually sit next to each
+    // other on screen (a real couple rendered together). This generalizes
+    // beyond just 2 parents — e.g. a stepchild with 2 biological parents
+    // (adjacent to each other) plus a step-parent recorded elsewhere in the
+    // tree entirely. Averaging every parent's x-position in one go would
+    // land the line in empty space between unrelated cards; instead each
+    // cluster gets its OWN connector line straight to the child.
+    const withPos = validParents
+      .map(pid=>({pid, pos:lastColumnIndex[pid]}))
+      .filter(x=>x.pos)
+      .sort((a,b)=> a.pos.level-b.pos.level || a.pos.col-b.pos.col);
+    const clusters = [];
+    withPos.forEach(item=>{
+      const last = clusters[clusters.length-1];
+      const prev = last && last[last.length-1];
+      const prevPerson = prev && personById(prev.pid);
+      const areSpouses = prevPerson && prevPerson.spouses && prevPerson.spouses.includes(item.pid);
+      if(prev && prev.pos.level===item.pos.level && item.pos.col-prev.pos.col===1 && areSpouses){
+        last.push(item);
+      } else {
+        clusters.push([item]);
+      }
+    });
+    // parents we couldn't locate on screen at all (shouldn't normally happen) fall back to their own solo cluster
+    validParents.forEach(pid=>{ if(!lastColumnIndex[pid]) clusters.push([{pid, pos:null}]); });
+
+    const childRect = cardRect(child.id);
+    if(!childRect) return;
+    const endX = childRect.cx;
+    const endY = childRect.top;
+    const childLevel = lastColumnIndex[child.id] ? lastColumnIndex[child.id].level : -1;
+
+    clusters.forEach(cluster=>{
+      const anchorIds = cluster.map(c=>c.pid);
+      const rects = anchorIds.map(cardRect).filter(Boolean);
+      if(rects.length===0) return;
+      const startX = rects.reduce((s,r)=>s+r.cx,0)/rects.length;
+      const startY = Math.max(...rects.map(r=>r.bottom));
+      const familyKey = anchorIds.slice().sort().join('|');
+      connectorJobs.push({familyKey, startX, startY, endX, endY, childLevel});
+    });
+  });
+
+  // Rank distinct family-groups feeding into each target row by their
+  // horizontal position, and space their elbow heights out evenly across
+  // that row's connectors — so lines naturally nest instead of colliding.
+  const lineColors = ['#8B7355','#5C7A6E','#A0654F','#6B7FA3','#8A6A8C','#7A8B4E','#B0764F','#5E8A8E'];
+  const byLevel = {};
+  connectorJobs.forEach(job=>{
+    (byLevel[job.childLevel] = byLevel[job.childLevel] || {});
+    if(!byLevel[job.childLevel][job.familyKey]) byLevel[job.childLevel][job.familyKey] = [];
+    byLevel[job.childLevel][job.familyKey].push(job);
+  });
+  Object.values(byLevel).forEach(familyMap=>{
+    const families = Object.keys(familyMap).map(key=>{
+      const jobs = familyMap[key];
+      const avgX = jobs.reduce((s,j)=>s+j.startX,0)/jobs.length;
+      return {key, jobs, avgX};
+    });
+    families.sort((a,b)=>a.avgX-b.avgX);
+    const n = families.length;
+    families.forEach((fam, idx)=>{
+      const fraction = n<=1 ? 0.5 : 0.28 + (idx/(n-1))*0.5;
+      let hash = 0;
+      for(let i=0;i<fam.key.length;i++){ hash = (hash*31 + fam.key.charCodeAt(i)) | 0; }
+      const lineColor = lineColors[Math.abs(hash) % lineColors.length];
+      fam.jobs.forEach(job=>{
+        const midY = job.startY + (job.endY-job.startY)*fraction;
+        const path = document.createElementNS(svgNS,'path');
+        path.setAttribute('d', `M ${job.startX} ${job.startY} L ${job.startX} ${midY} L ${job.endX} ${midY} L ${job.endX} ${job.endY}`);
+        path.setAttribute('stroke', lineColor);
+        path.setAttribute('stroke-width','2');
+        path.setAttribute('fill','none');
+        path.setAttribute('opacity','0.8');
+        svg.appendChild(path);
+      });
+    });
+  });
+
+  canvas.insertBefore(svg, canvas.firstChild);
+}
+
+/* ============ Hide / unhide ============ */
+function setPersonVisible(id, visible){
+  const p = personById(id);
+  if(!p) return;
+  p.hidden = !visible;
+}
+
+function hidePerson(id){
+  pushHistory();
+  const p = personById(id);
+  if(!p) return;
+  setPersonVisible(id, false);
+  if(selectedId===id) selectedId=null;
+  saveData();
+  render();
+  renderSidePanel();
+  renderHiddenPanel();
+  centerTree();
+  toast(`已隐藏「${p.name}」及其后代分支，可在"显示筛选"中恢复`);
+}
+function unhidePerson(id){
+  pushHistory();
+  const p = personById(id);
+  if(!p) return;
+  setPersonVisible(id, true);
+  saveData();
+  render();
+  renderSidePanel();
+  renderHiddenPanel();
+  centerTree();
+  toast(`已恢复显示「${p.name}」及其后代分支`);
+}
+function updateHiddenBadge(){
+  const hiddenCount = people.filter(p=>p.hidden).length;
+  const badge = document.getElementById('hiddenCount');
+  if(!badge) return;
+  badge.textContent = hiddenCount>0 ? hiddenCount : '';
+}
+function enterFocus(id){
+  const p = personById(id);
+  if(!p) return;
+  focusPersonId = id;
+  render();
+  renderSidePanel();
+  centerTree();
+  toast(`已聚焦「${p.name}」的家庭`);
+  recordNavState();
+}
+function centerOnPerson(id){
+  requestAnimationFrame(()=>{
+    const wrap = document.getElementById('canvasWrap');
+    const el = document.querySelector('.card[data-id="'+id+'"]');
+    if(!wrap || !el){ centerTree(); return; }
+    const wrapRect = wrap.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const elCenterX = elRect.left + elRect.width/2;
+    const elCenterY = elRect.top + elRect.height/2;
+    const wrapCenterX = wrapRect.left + wrapRect.width/2;
+    const wrapCenterY = wrapRect.top + wrapRect.height/2;
+    // pan is a plain screen-pixel offset (applied outside the canvas's own
+    // scale), so a plain screen-pixel delta can be added directly here.
+    pan.x += (wrapCenterX - elCenterX);
+    pan.y += (wrapCenterY - elCenterY);
+    applyTransform();
+  });
+}
+function exitFocus(){
+  const previousFocus = focusPersonId;
+  focusPersonId = null;
+  render();
+  renderSidePanel();
+  if(previousFocus && personById(previousFocus)) centerOnPerson(previousFocus);
+  else centerTree();
+  recordNavState();
+}
+function adjustFocusGen(which, delta){
+  if(which==='up') focusUpGen = Math.max(0, Math.min(15, focusUpGen+delta));
+  else focusDownGen = Math.max(0, Math.min(15, focusDownGen+delta));
+  render();
+  centerTree();
+}
+function renameCurrentTree(){
+  const t = trees.find(x=>x.id===currentTreeId);
+  if(!t) return;
+  const name = prompt('给这棵家族树改个名字：', t.name);
+  if(!name || !name.trim() || name.trim()===t.name) return;
+  pushHistory();
+  t.name = name.trim();
+  saveData();
+  renderTreeSelect();
+  toast(`已重命名为「${t.name}」`);
+}
+
+/* ============ Back / forward browsing history ============ */
+let navHistory = [];
+let navIndex = -1;
+let navigatingHistory = false; // guard so restoring a state doesn't re-record itself
+function recordNavState(){
+  if(navigatingHistory) return;
+  const state = { selectedId, currentTreeId, focusPersonId, focusUpGen, focusDownGen, focusSidewaysLevels: Array.from(focusSidewaysLevels) };
+  const prev = navHistory[navIndex];
+  if(prev && JSON.stringify(prev)===JSON.stringify(state)) return; // no real change, skip
+  navHistory = navHistory.slice(0, navIndex+1);
+  navHistory.push(state);
+  navIndex = navHistory.length-1;
+  if(navHistory.length>50){ navHistory.shift(); navIndex--; }
+  updateNavButtons();
+}
+function restoreNavState(state){
+  navigatingHistory = true;
+  selectedId = state.selectedId;
+  currentTreeId = state.currentTreeId;
+  focusPersonId = state.focusPersonId;
+  focusUpGen = state.focusUpGen;
+  focusDownGen = state.focusDownGen;
+  focusSidewaysLevels = new Set(state.focusSidewaysLevels || []);
+  renderTreeSelect();
+  render();
+  renderSidePanel();
+  if(selectedId && personById(selectedId)) centerOnPerson(selectedId);
+  else if(focusPersonId && personById(focusPersonId)) centerOnPerson(focusPersonId);
+  else centerTree();
+  navigatingHistory = false;
+  updateNavButtons();
+}
+function navBack(){
+  if(navIndex<=0) return;
+  navIndex--;
+  restoreNavState(navHistory[navIndex]);
+}
+function navForward(){
+  if(navIndex>=navHistory.length-1) return;
+  navIndex++;
+  restoreNavState(navHistory[navIndex]);
+}
+function updateNavButtons(){
+  const backBtn = document.getElementById('navBackBtn');
+  const fwdBtn = document.getElementById('navForwardBtn');
+  if(backBtn) backBtn.disabled = navIndex<=0;
+  if(fwdBtn) fwdBtn.disabled = navIndex>=navHistory.length-1;
+}
+
+function renderTreeSelect(){
+  const sel = document.getElementById('treeSelect');
+  if(!sel) return;
+  sel.innerHTML = trees.map(t=>`<option value="${t.id}" ${t.id===currentTreeId?'selected':''}>${escapeHtml(t.name)}</option>`).join('');
+}
+function switchTree(treeId){
+  if(!trees.some(t=>t.id===treeId)) return;
+  currentTreeId = treeId;
+  selectedId = null;
+  focusPersonId = null;
+  saveData();
+  renderTreeSelect();
+  render();
+  renderSidePanel();
+  centerTree();
+  recordNavState();
+}
+function addNewTree(){
+  const name = prompt('新家族树的名称，例如"妻子的家族"：');
+  if(!name || !name.trim()) return;
+  pushHistory();
+  const id = 'tree_' + Date.now();
+  trees.push({id, name: name.trim()});
+  currentTreeId = id;
+  saveData();
+  renderTreeSelect();
+  render();
+  renderSidePanel();
+  centerTree();
+  toast(`已新建「${name.trim()}」，现在添加的成员会归入这棵树`);
+}
+function collectDescendants(id, acc){
+  acc = acc || new Set();
+  childrenOf(id).forEach(c=>{
+    if(!acc.has(c.id)){ acc.add(c.id); collectDescendants(c.id, acc); }
+  });
+  return acc;
+}
+let moveTreePersonId = null;
+function openMoveTreeModal(id){
+  const p = personById(id);
+  if(!p) return;
+  moveTreePersonId = id;
+  document.getElementById('moveTreeSubject').textContent = `将「${p.name}」移动到：`;
+  const sel = document.getElementById('moveTreeSelect');
+  sel.innerHTML = trees.filter(t=>t.id!==(p.treeId||'main')).map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  document.getElementById('moveTreeCascade').checked = true;
+  document.getElementById('moveTreeOverlay').classList.add('show');
+}
+function confirmMoveTree(){
+  pushHistory();
+  const p = personById(moveTreePersonId);
+  if(!p) return;
+  const targetTreeId = document.getElementById('moveTreeSelect').value;
+  const cascade = document.getElementById('moveTreeCascade').checked;
+  if(!targetTreeId) return;
+  const ids = new Set([p.id]);
+  if(cascade) collectDescendants(p.id, ids);
+  ids.forEach(id=>{
+    const person = personById(id);
+    if(person) person.treeId = targetTreeId;
+  });
+  saveData();
+  document.getElementById('moveTreeOverlay').classList.remove('show');
+  selectedId = null;
+  render();
+  renderSidePanel();
+  centerTree();
+  toast(`已移动 ${ids.size} 位成员到「${trees.find(t=>t.id===targetTreeId).name}」`);
+}
+function goToBridgePerson(id){
+  const p = personById(id);
+  if(!p) return;
+  currentTreeId = p.treeId || 'main';
+  focusPersonId = null;
+  selectedId = id;
+  saveData();
+  renderTreeSelect();
+  render();
+  renderSidePanel();
+  centerTree();
+  recordNavState();
+}
+function updateFocusBar(){
+  const bar = document.getElementById('focusBar');
+  if(!bar) return;
+  if(!focusPersonId || !personById(focusPersonId)){
+    bar.style.display='none';
+    document.body.classList.remove('has-focus-bar');
+    return;
+  }
+  bar.style.display='flex';
+  document.body.classList.add('has-focus-bar');
+  document.getElementById('focusName').textContent = personById(focusPersonId).name;
+  document.getElementById('focusUpVal').textContent = focusUpGen;
+  document.getElementById('focusDownVal').textContent = focusDownGen;
+
+  const genNames = ['本人','父母','祖父母','曾祖父母','高祖父母'];
+  const wrap = document.getElementById('focusSidewaysToggles');
+  if(wrap){
+    const chips = [];
+    for(let d=0; d<=focusUpGen; d++){
+      const label = genNames[d] || `上${d}代`;
+      chips.push(`<button class="sideways-chip ${focusSidewaysLevels.has(d)?'active':''}" data-sideways-level="${d}" title="展开这一代的兄弟姐妹/表亲">旁支·${label}</button>`);
+    }
+    wrap.innerHTML = chips.join('');
+    wrap.querySelectorAll('[data-sideways-level]').forEach(chip=>{
+      chip.addEventListener('click', ()=>{
+        const d = parseInt(chip.dataset.sidewaysLevel, 10);
+        if(focusSidewaysLevels.has(d)) focusSidewaysLevels.delete(d);
+        else focusSidewaysLevels.add(d);
+        render();
+        centerTree();
+      });
+    });
+  }
+}
+let mapHubCountry = null; // user-chosen country to draw root-style connector lines from
+let worldMapSVGText = null; // cached after first successful load
+let worldMapLoadAttempted = false;
+async function loadWorldMapSVG(){
+  if(worldMapSVGText || worldMapLoadAttempted) return worldMapSVGText;
+  worldMapLoadAttempted = true;
+  const sources = [
+    'https://cdn.jsdelivr.net/gh/flekschas/simple-world-map@master/world-map.min.svg',
+    'https://cdn.statically.io/gh/flekschas/simple-world-map/master/world-map.min.svg',
+  ];
+  for(const url of sources){
+    try{
+      const res = await fetch(url);
+      if(res.ok){
+        const text = await res.text();
+        if(text.includes('<svg') && text.includes('<path')){
+          worldMapSVGText = text;
+          return worldMapSVGText;
+        }
+      }
+    }catch(e){ /* try next source */ }
+  }
+  return null;
+}
+
+async function renderMapView(){
+  const wrap = document.getElementById('mapCanvasWrap');
+  const outerWrap = document.getElementById('mapCanvasOuter');
+  if(!wrap) return;
+  if(outerWrap){ const oldPop = outerWrap.querySelector('.map-popover'); if(oldPop) oldPop.remove(); }
+  wrap.innerHTML = '<div class="map-empty">正在加载地图…</div>';
+
+  // group people (across all trees) by matched country
+  const groups = {}; // countryName -> {lat,lng,iso,people:[]}
+  people.forEach(p=>{
+    if(!p.country) return;
+    const match = lookupCountryCoords(p.country);
+    if(!match) return;
+    if(!groups[match.name]) groups[match.name] = {lat:match.lat, lng:match.lng, iso:match.iso, people:[]};
+    groups[match.name].people.push(p);
+  });
+  const countryNames = Object.keys(groups);
+
+  if(countryNames.length===0){
+    wrap.innerHTML = '<div class="map-empty">还没有成员填写"居住国家"。<br>在编辑成员时填写这个字段，就会在地图上显示出来。</div>';
+    return;
+  }
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const mapText = await loadWorldMapSVG();
+
+  let svg, W, H, getPinPos;
+
+  if(mapText){
+    // Real world map: parse it, recolor to match the app's palette, and find
+    // each matched country's actual shape (by ISO code) to anchor pins
+    // precisely — no lat/lng guesswork needed for countries it contains.
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(mapText, 'image/svg+xml');
+    svg = doc.querySelector('svg');
+    svg = document.importNode(svg, true);
+    const vb = (svg.getAttribute('viewBox')||'0 0 1000 500').split(/\s+/).map(Number);
+    const [minX, minY] = vb; W = vb[2]; H = vb[3];
+    svg.removeAttribute('width'); svg.removeAttribute('height');
+    svg.style.width = '100%'; svg.style.display = 'block';
+    svg.querySelectorAll('path').forEach(p=>{
+      p.setAttribute('fill', '#E4D9BE');
+      p.setAttribute('stroke', '#C9B98F');
+      p.setAttribute('stroke-width', '0.6');
+    });
+    getPinPos = (g)=>{
+      const fallback = {x: minX+(g.lng+180)/360*W, y: minY+(90-g.lat)/180*H};
+      if(g.iso){
+        const matches = svg.querySelectorAll('#'+g.iso);
+        let el = null;
+        matches.forEach(m=>{ if(m.classList && m.classList.contains('mainland')) el = m; });
+        if(!el && matches.length) el = matches[0];
+        if(el && el.getBBox){
+          try{
+            const bb = el.getBBox();
+            const isoPos = {x: bb.x+bb.width/2, y: bb.y+bb.height/2};
+            // Sanity-check against the rough lat/lng position — if the ISO
+            // match landed far from where the country should roughly be
+            // (e.g. it matched a stray/wrongly-labeled fragment), trust the
+            // lat/lng fallback instead rather than showing an obviously
+            // wrong location like "France" pinned in the Sahara.
+            const dx = Math.abs(isoPos.x-fallback.x)/W, dy = Math.abs(isoPos.y-fallback.y)/H;
+            if(dx<0.3 && dy<0.3) return isoPos;
+          }catch(e){}
+        }
+      }
+      return fallback;
+    };
+  } else {
+    // Fallback: simplified schematic continents (used if the map couldn't be
+    // fetched — e.g. no internet access at the moment)
+    W = 1000; H = 500;
+    svg = document.createElementNS(svgNS,'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.style.width = '100%'; svg.style.display = 'block';
+    const ocean = document.createElementNS(svgNS,'rect');
+    ocean.setAttribute('width', W); ocean.setAttribute('height', H); ocean.setAttribute('fill', '#BFDCE0');
+    svg.appendChild(ocean);
+    const continents = [
+      {cx:190, cy:150, rx:115, ry:95}, {cx:270, cy:340, rx:70, ry:115},
+      {cx:500, cy:115, rx:70, ry:55}, {cx:515, cy:280, rx:90, ry:120},
+      {cx:740, cy:150, rx:175, ry:110}, {cx:835, cy:365, rx:70, ry:45},
+    ];
+    continents.forEach(c=>{
+      const el = document.createElementNS(svgNS,'ellipse');
+      el.setAttribute('cx', c.cx); el.setAttribute('cy', c.cy);
+      el.setAttribute('rx', c.rx); el.setAttribute('ry', c.ry);
+      el.setAttribute('fill', '#E4D9BE');
+      svg.appendChild(el);
+    });
+    getPinPos = (g)=>({x:(g.lng+180)/360*W, y:(90-g.lat)/180*H});
+  }
+
+  // Insert the base map into the DOM FIRST — getBBox() below needs the
+  // element to actually be rendered/laid out to return correct results.
+  wrap.innerHTML = '';
+  wrap.appendChild(svg);
+
+  // compute each country's pin position
+  const positions = {};
+  countryNames.forEach(name=>{ positions[name] = getPinPos(groups[name]); });
+
+  // populate the hub picker with the countries that actually have data,
+  // preserving the current selection if it's still valid
+  const hubSelect = document.getElementById('mapHubSelect');
+  if(hubSelect){
+    const prevValue = mapHubCountry && countryNames.includes(mapHubCountry) ? mapHubCountry : '';
+    hubSelect.innerHTML = '<option value="">不显示连接线</option>' +
+      countryNames.map(n=>`<option value="${n}" ${n===prevValue?'selected':''}>${escapeHtml(n)} (${groups[n].people.length})</option>`).join('');
+    mapHubCountry = prevValue || null;
+  }
+
+  // draw golden root-like curved lines from the user-chosen hub country to
+  // every other one — a nod to the family-tree's branches reaching around
+  // the world. No lines are drawn until the user picks a hub.
+  const hubName = mapHubCountry && countryNames.includes(mapHubCountry) ? mapHubCountry : null;
+  if(hubName){
+    const hubPos = positions[hubName];
+    const linesLayer = document.createElementNS(svgNS,'g');
+    linesLayer.setAttribute('opacity','0.75');
+    countryNames.forEach(name=>{
+      if(name===hubName) return;
+      const pos = positions[name];
+      const midX = (hubPos.x+pos.x)/2, midY = Math.min(hubPos.y,pos.y)-Math.abs(pos.x-hubPos.x)*0.12-10;
+      const path = document.createElementNS(svgNS,'path');
+      path.setAttribute('d', `M ${hubPos.x} ${hubPos.y} Q ${midX} ${midY}, ${pos.x} ${pos.y}`);
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke','url(#rootGradient)');
+      path.setAttribute('stroke-width','1.8');
+      linesLayer.appendChild(path);
+    });
+    const defs = document.createElementNS(svgNS,'defs');
+    defs.innerHTML = `<linearGradient id="rootGradient" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#B9863C"/><stop offset="100%" stop-color="#D9AE6E"/>
+  </linearGradient>`;
+    svg.appendChild(defs);
+    svg.appendChild(linesLayer);
+  }
+
+  // pins
+  countryNames.forEach(name=>{
+    const g = groups[name];
+    const pos = positions[name];
+    const group = document.createElementNS(svgNS,'g');
+    group.setAttribute('class','map-pin');
+    group.setAttribute('data-country', name);
+
+    const glow = document.createElementNS(svgNS,'circle');
+    glow.setAttribute('cx', pos.x); glow.setAttribute('cy', pos.y);
+    glow.setAttribute('r', name===hubName ? 13 : 10);
+    glow.setAttribute('fill', 'var(--accent-2)');
+    glow.setAttribute('opacity', '0.25');
+    group.appendChild(glow);
+
+    const circle = document.createElementNS(svgNS,'circle');
+    circle.setAttribute('cx', pos.x); circle.setAttribute('cy', pos.y);
+    circle.setAttribute('r', name===hubName ? 7 : 5.5);
+    circle.setAttribute('fill', 'var(--accent-2)');
+    circle.setAttribute('stroke', '#fff');
+    circle.setAttribute('stroke-width', '1.6');
+    group.appendChild(circle);
+
+    const label = document.createElementNS(svgNS,'text');
+    label.setAttribute('x', pos.x);
+    label.setAttribute('y', pos.y-11);
+    label.setAttribute('text-anchor','middle');
+    label.setAttribute('font-size', name===hubName ? '13' : '11');
+    label.setAttribute('font-weight', name===hubName ? '700' : '600');
+    label.setAttribute('fill','#5B4A2F');
+    label.setAttribute('stroke','#F6F1E4');
+    label.setAttribute('stroke-width','3');
+    label.setAttribute('paint-order','stroke');
+    label.textContent = `${name} (${g.people.length})`;
+    group.appendChild(label);
+
+    group.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      showMapPopover(name, g, {x:pos.x/W*100, y:pos.y/H*100}, outerWrap || wrap);
+    });
+    svg.appendChild(group);
+  });
+
+  if(mapText){
+    const credit = document.createElement('div');
+    credit.className = 'map-credit';
+    credit.innerHTML = '地图数据：<a href="https://github.com/flekschas/simple-world-map" target="_blank" rel="noopener">flekschas/simple-world-map</a>（CC BY-SA）';
+    wrap.appendChild(credit);
+  }
+}
+
+function showMapPopover(countryName, group, pos, wrap){
+  const old = wrap.querySelector('.map-popover');
+  if(old) old.remove();
+  const pop = document.createElement('div');
+  pop.className = 'map-popover';
+  pop.style.left = `min(${pos.x}%, 78%)`;
+  pop.style.top = `min(${pos.y}%, 75%)`;
+  pop.innerHTML = `
+    <div class="mp-title">${escapeHtml(countryName)} · ${group.people.length}位</div>
+    ${group.people.map(p=>{
+      const avatarInner = photoSrc(p) ? `<img src="${photoSrc(p)}">` : initials(p.name);
+      return `<div class="mp-person" data-goto-map="${p.id}"><div class="mp-avatar">${avatarInner}</div>${escapeHtml(p.name)}</div>`;
+    }).join('')}
+  `;
+  wrap.appendChild(pop);
+  pop.querySelectorAll('[data-goto-map]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = el.dataset.gotoMap;
+      const person = personById(id);
+      if(person){
+        currentTreeId = person.treeId || 'main';
+        renderTreeSelect();
+        selectPerson(id);
+      }
+      document.getElementById('mapOverlay').classList.remove('show');
+    });
+  });
+}
+
+function renderHiddenPanel(){
+  const list = document.getElementById('hiddenList');
+  const q = (document.getElementById('filterSearch').value || '').trim().toLowerCase();
+  const relevant = people.filter(p=> (p.treeId||'main')===currentTreeId || isBridgePerson(p.id));
+  const items = relevant.filter(p=> !q || p.name.toLowerCase().includes(q));
+  if(items.length===0){
+    list.innerHTML = '<div class="none" style="padding:10px;">没有找到匹配的成员</div>';
+    return;
+  }
+  list.innerHTML = items.map(p=>{
+    const avatarInner = photoSrc(p) ? `<img src="${photoSrc(p)}">` : initials(p.name);
+    const kidCount = childrenOf(p.id).length;
+    const bridge = isBridgePerson(p.id);
+    const blockedByAncestor = !p.hidden && !bridge && !isVisible(p.id);
+    return `<label class="filter-row">
+      <input type="checkbox" data-toggle="${p.id}" ${p.hidden ? '' : 'checked'} ${bridge?'disabled':''}>
+      <div class="mini-avatar">${avatarInner}</div>
+      <div class="fname">${escapeHtml(p.name)}</div>
+      ${kidCount>0 ? `<div class="fmeta">含 ${kidCount} 位后代</div>` : ''}
+      ${blockedByAncestor ? `<div class="fmeta" style="color:var(--danger);">上层已收起</div>` : ''}
+      ${bridge ? `<div class="fmeta">来自另一棵家族树</div>` : ''}
+    </label>`;
+  }).join('');
+  list.querySelectorAll('[data-toggle]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      if(cb.checked) unhidePerson(cb.dataset.toggle);
+      else hidePerson(cb.dataset.toggle);
+    });
+  });
+}
+function setAllVisible(visible){
+  pushHistory();
+  people.forEach(p=> p.hidden = !visible);
+  selectedId = null;
+  saveData();
+  render();
+  renderSidePanel();
+  renderHiddenPanel();
+  centerTree();
+  toast(visible ? '已显示全部成员' : '已隐藏全部成员');
+}
+
+/* ============ Selection / side panel ============ */
+function selectPerson(id){
+  selectedId = id;
+  render();
+  renderSidePanel();
+  recordNavState();
+}
+
+function renderSidePanel(){
+  const panel = document.getElementById('sidePanel');
+  if(!selectedId){ panel.classList.add('hidden'); return; }
+  const p = personById(selectedId);
+  if(!p){ panel.classList.add('hidden'); selectedId=null; return; }
+  panel.classList.remove('hidden');
+
+  const parents = (p.parents||[]).map(personById).filter(Boolean);
+  const spouses = (p.spouses||[]).map(personById).filter(Boolean);
+  const kids = childrenOf(p.id);
+
+  function chip(person, label){
+    const avatarInner = person.photo ? `<img src="${person.photo}">` : initials(person.name);
+    const hiddenTag = person.hidden ? '<span style="color:var(--danger);">（已隐藏）</span>' : '';
+    return `<div class="rel-chip" data-goto="${person.id}">
+      <div class="mini-avatar">${avatarInner}</div>
+      <div>${escapeHtml(person.name)}${label?('<span style="color:var(--ink-soft)"> · '+label+'</span>'):''}${hiddenTag}</div>
+    </div>`;
+  }
+
+  panel.innerHTML = `
+    <button class="panel-close-btn" id="panelCloseBtn" title="关闭详情面板">✕</button>
+    <div style="position:relative; width:88px; margin:0 auto;">
+      <button class="panel-hide-toggle ${p.hidden?'is-hidden':''}" data-action="quick-hide" title="${p.hidden?'显示此人':'隐藏此人'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 20c-5.5 0-9.5-4.5-11-8 .8-1.8 2.1-3.7 3.9-5.2M9.9 4.2A10.6 10.6 0 0 1 12 4c5.5 0 9.5 4.5 11 8-.5 1.1-1.2 2.3-2.1 3.4M9.5 9.5a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>
+      </button>
+      <div class="detail-avatar">${photoSrc(p)?`<img src="${photoSrc(p)}">`:initials(p.name)}</div>
+    </div>
+    <div class="detail-name">${escapeHtml(p.name)} ${p.hidden?'<span style="color:var(--danger); font-size:12px; font-weight:600;">（已隐藏）</span>':''}</div>
+    <div class="detail-years">${yearsLabel(p) || '　'}</div>
+    ${isBridgePerson(p.id) ? `<div class="bridge-notice" data-goto-tree-panel="${p.id}">🔗 属于「${escapeHtml((trees.find(t=>t.id===(p.treeId||'main'))||{}).name||'其他家族')}」— 点击前往查看</div>` : ''}
+    ${p.notes ? `<div class="detail-notes">${escapeHtml(p.notes)}</div>` : ''}
+
+    <div class="detail-section-title">父母</div>
+    <div class="rel-list">${parents.length? parents.map(x=>chip(x)).join('') : '<div class="hint">未记录</div>'}</div>
+
+    <div class="detail-section-title">配偶</div>
+    <div class="rel-list">${spouses.length? spouses.map(x=>chip(x)).join('') : '<div class="hint">未记录</div>'}</div>
+
+    <div class="detail-section-title">子女</div>
+    <div class="rel-list">${kids.length? kids.map(x=>chip(x)).join('') : '<div class="hint">未记录</div>'}</div>
+
+    <div class="quick-actions">
+      <button class="btn btn-ghost" data-action="add-parent">+ 父母</button>
+      <button class="btn btn-ghost" data-action="add-spouse">+ 配偶</button>
+      <button class="btn btn-ghost" data-action="add-child">+ 子女</button>
+      ${kids.length>0 ? `<button class="btn btn-ghost" data-action="toggle-collapse">${p.collapsed?'展开下一代':'收起下一代'}</button>` : ''}
+      <button class="btn btn-ghost" data-action="focus">${focusPersonId===p.id ? '已聚焦 · 点击退出' : '聚焦查看此人'}</button>
+    </div>
+    <div class="detail-footer">
+      <button class="btn btn-ghost" data-action="edit">编辑</button>
+      <button class="btn btn-ghost" data-action="toggle-hide">${p.hidden?'显示此人':'隐藏此人'}</button>
+      <button class="btn btn-danger" data-action="delete">删除</button>
+    </div>
+    ${trees.length>1 ? `<button class="btn btn-ghost" data-action="move-tree" style="width:100%; margin-top:10px; justify-content:center;">移动到其他家族树…</button>` : ''}
+  `;
+
+  panel.querySelectorAll('[data-goto]').forEach(el=>{
+    el.addEventListener('click', ()=>selectPerson(el.dataset.goto));
+  });
+  panel.querySelector('#panelCloseBtn').addEventListener('click', ()=>{
+    selectedId = null;
+    render();
+    renderSidePanel();
+    recordNavState();
+  });
+  const bridgeNotice = panel.querySelector('[data-goto-tree-panel]');
+  if(bridgeNotice) bridgeNotice.addEventListener('click', ()=>goToBridgePerson(p.id));
+  panel.querySelector('[data-action="edit"]').addEventListener('click', ()=>openModal(p.id));
+  panel.querySelector('[data-action="delete"]').addEventListener('click', ()=>deletePerson(p.id));
+  panel.querySelector('[data-action="toggle-hide"]').addEventListener('click', ()=>{
+    if(p.hidden) unhidePerson(p.id); else hidePerson(p.id);
+  });
+  panel.querySelector('[data-action="quick-hide"]').addEventListener('click', ()=>{
+    if(p.hidden) unhidePerson(p.id); else hidePerson(p.id);
+  });
+  panel.querySelector('[data-action="focus"]').addEventListener('click', ()=>{
+    if(focusPersonId===p.id) exitFocus(); else enterFocus(p.id);
+  });
+  const collapseBtn = panel.querySelector('[data-action="toggle-collapse"]');
+  if(collapseBtn) collapseBtn.addEventListener('click', ()=>toggleCollapse(p.id));
+  panel.querySelector('[data-action="add-parent"]').addEventListener('click', ()=>openModal(null, {presetChildOf: p.id, mode:'parent'}));
+  panel.querySelector('[data-action="add-spouse"]').addEventListener('click', ()=>openModal(null, {presetSpouseOf: p.id}));
+  panel.querySelector('[data-action="add-child"]').addEventListener('click', ()=>openModal(null, {presetParent: p.id}));
+  const moveBtn = panel.querySelector('[data-action="move-tree"]');
+  if(moveBtn) moveBtn.addEventListener('click', ()=>openMoveTreeModal(p.id));
+}
+
+/* ============ Delete ============ */
+function deletePerson(id){
+  const p = personById(id);
+  if(!confirm(`确定要删除「${p.name}」吗？TA与其他成员的关系也会被移除，但其他成员本身不会被删除。`)) return;
+  pushHistory();
+  people = people.filter(x=>x.id!==id);
+  people.forEach(x=>{
+    if(x.parents) x.parents = x.parents.filter(pid=>pid!==id);
+    if(x.spouses) x.spouses = x.spouses.filter(sid=>sid!==id);
+  });
+  if(selectedId===id) selectedId=null;
+  saveData();
+  render();
+  renderSidePanel();
+  toast('已删除 ' + p.name);
+}
+
+/* ============ Modal (add/edit) ============ */
+let modalPhotoId = null;
+let modalPreset = {};
+
+function openModal(id, preset){
+  editingId = id;
+  modalPreset = preset || {};
+  modalPhotoId = null;
+  const overlay = document.getElementById('modalOverlay');
+  document.getElementById('modalTitle').textContent = id ? '编辑成员' : '添加成员';
+  document.getElementById('fName').value = '';
+  document.getElementById('fBirth').value = '';
+  document.getElementById('fDeath').value = '';
+  document.getElementById('fCountry').value = '';
+  document.getElementById('fNotes').value = '';
+  document.getElementById('photoPreview').innerHTML = '👤';
+  document.querySelectorAll('input[name=gender]').forEach(r=>r.checked = r.value==='M');
+
+  populateMultiSelect('parentsSelect', people, [], 4);
+  populateMultiSelect('spousesSelect', people, [], 99);
+
+  if(id){
+    const p = personById(id);
+    document.getElementById('fName').value = p.name || '';
+    document.getElementById('fBirth').value = p.birth || '';
+    document.getElementById('fDeath').value = p.death || '';
+    document.getElementById('fCountry').value = p.country || '';
+    document.getElementById('fNotes').value = p.notes || '';
+    modalPhotoId = p.photoId || null;
+    if(photoSrc(p)) document.getElementById('photoPreview').innerHTML = `<img src="${photoSrc(p)}">`;
+    document.querySelectorAll('input[name=gender]').forEach(r=>r.checked = r.value===p.gender);
+    populateMultiSelect('parentsSelect', people.filter(x=>x.id!==id), p.parents||[], 4);
+    populateMultiSelect('spousesSelect', people.filter(x=>x.id!==id), p.spouses||[], 99);
+  } else if(modalPreset.presetParent){
+    populateMultiSelect('parentsSelect', people, [modalPreset.presetParent], 4);
+  }
+
+  overlay.classList.add('show');
+  document.getElementById('fName').focus();
+}
+
+function populateMultiSelect(containerId, list, selectedIds, max){
+  const el = document.getElementById(containerId);
+  if(list.length===0){ el.innerHTML = '<div class="none">暂无其他成员可选</div>'; return; }
+  el.innerHTML = list.map(p=>`
+    <label>
+      <input type="checkbox" value="${p.id}" ${selectedIds.includes(p.id)?'checked':''}>
+      <span>${escapeHtml(p.name)}</span>
+    </label>
+  `).join('');
+  if(max && max<99){
+    el.onchange = (event)=>{
+      const checked = el.querySelectorAll('input:checked');
+      if(checked.length>max){
+        event.target.checked = false;
+        toast(`最多选择 ${max} 位`);
+      }
+    };
+  } else {
+    el.onchange = null;
+  }
+}
+
+function quickAddPerson(name, containerId, max){
+  name = name.trim();
+  if(!name){ toast('请先输入姓名'); return; }
+  pushHistory();
+  const newPerson = { id:uid(), name, gender:'O', birth:'', death:'', notes:'', photo:null, parents:[], spouses:[], treeId: currentTreeId };
+  people.push(newPerson);
+  saveData();
+
+  const checked = Array.from(document.querySelectorAll('#'+containerId+' input:checked')).map(i=>i.value);
+  if(max && max<99 && checked.length>=max){
+    toast(`已新建「${name}」，但父母已选满 ${max} 位，请先取消勾选一位再选择TA`);
+  } else {
+    checked.push(newPerson.id);
+  }
+  const excludeId = editingId;
+  const list = people.filter(p=>p.id!==excludeId);
+  populateMultiSelect(containerId, list, checked, max);
+  toast('已新建 ' + name);
+  return newPerson.id;
+}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('show');
+  editingId = null;
+  modalPreset = {};
+}
+
+function saveModal(){
+  const name = document.getElementById('fName').value.trim();
+  if(!name){ toast('请填写姓名'); return; }
+  pushHistory();
+  const gender = document.querySelector('input[name=gender]:checked').value;
+  const birth = document.getElementById('fBirth').value.trim();
+  const death = document.getElementById('fDeath').value.trim();
+  const country = document.getElementById('fCountry').value.trim();
+  const notes = document.getElementById('fNotes').value.trim();
+  const parentIds = Array.from(document.querySelectorAll('#parentsSelect input:checked')).map(i=>i.value);
+  const spouseIds = Array.from(document.querySelectorAll('#spousesSelect input:checked')).map(i=>i.value);
+
+  if(editingId){
+    const p = personById(editingId);
+    // clean old spouse links then relink
+    people.forEach(x=>{ if(x.spouses) x.spouses = x.spouses.filter(id=>id!==editingId); });
+    p.name=name; p.gender=gender; p.birth=birth; p.death=death; p.country=country; p.notes=notes;
+    p.photoId = modalPhotoId;
+    p.parents = parentIds;
+    p.spouses = spouseIds;
+    spouseIds.forEach(sid=>{
+      const sp = personById(sid);
+      if(sp){ sp.spouses = sp.spouses||[]; if(!sp.spouses.includes(editingId)) sp.spouses.push(editingId); }
+    });
+    saveData(); render(); renderSidePanel();
+    toast('已更新 ' + name);
+  } else {
+    const newId = uid();
+    const newPerson = { id:newId, name, gender, birth, death, country, notes, photoId: modalPhotoId, parents: parentIds, spouses: spouseIds, treeId: currentTreeId };
+    people.push(newPerson);
+    spouseIds.forEach(sid=>{
+      const sp = personById(sid);
+      if(sp){ sp.spouses = sp.spouses||[]; if(!sp.spouses.includes(newId)) sp.spouses.push(newId); }
+    });
+    if(modalPreset.presetSpouseOf){
+      const sp = personById(modalPreset.presetSpouseOf);
+      if(sp){
+        sp.spouses = sp.spouses||[]; if(!sp.spouses.includes(newId)) sp.spouses.push(newId);
+        newPerson.spouses.push(sp.id);
+      }
+    }
+    if(modalPreset.presetChildOf){
+      const child = personById(modalPreset.presetChildOf);
+      if(child){ child.parents = child.parents||[]; if(!child.parents.includes(newId)) child.parents.push(newId); }
+    }
+    selectedId = newId;
+    saveData(); render(); renderSidePanel();
+    toast('已添加 ' + name);
+  }
+  closeModal();
+}
+
+/* ============ Search ============ */
+function handleSearch(){
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const box = document.getElementById('searchResults');
+  if(!q){ box.classList.remove('show'); box.innerHTML=''; return; }
+  const matches = people.filter(p=>p.name.toLowerCase().includes(q)).slice(0,8);
+  if(matches.length===0){ box.innerHTML = '<div class="search-item" style="color:var(--ink-soft)">未找到匹配成员</div>'; box.classList.add('show'); return; }
+  box.innerHTML = matches.map(p=>{
+    const avatarInner = photoSrc(p) ? `<img style="width:100%;height:100%;object-fit:cover;border-radius:50%;" src="${photoSrc(p)}">` : '';
+    const hiddenTag = p.hidden ? ' <span style="color:var(--danger); font-size:11px;">（已隐藏）</span>' : '';
+    const otherTree = (p.treeId||'main')!==currentTreeId ? ` <span style="color:var(--accent); font-size:11px;">（${escapeHtml((trees.find(t=>t.id===(p.treeId||'main'))||{}).name||'其他家族')}）</span>` : '';
+    return `<div class="search-item" data-id="${p.id}"><span style="width:20px;height:20px;border-radius:50%;background:var(--bg-alt);display:inline-flex;align-items:center;justify-content:center;font-size:10px;overflow:hidden;">${avatarInner || initials(p.name)}</span>${escapeHtml(p.name)}${otherTree}${hiddenTag}</div>`;
+  }).join('');
+  box.classList.add('show');
+  box.querySelectorAll('[data-id]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const person = personById(el.dataset.id);
+      box.classList.remove('show');
+      document.getElementById('searchInput').value='';
+      const personTree = person ? (person.treeId||'main') : currentTreeId;
+      if(personTree!==currentTreeId){
+        currentTreeId = personTree;
+        saveData();
+        renderTreeSelect();
+      }
+      selectPerson(el.dataset.id);
+      if(!person.hidden) focusOn(el.dataset.id);
+    });
+  });
+}
+function focusOn(id){
+  centerOnPerson(id);
+}
+
+/* ============ Zoom / Pan ============ */
+function applyTransform(){
+  document.getElementById('canvas').style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
+  document.getElementById('zoomReset').textContent = Math.round(zoom*100)+'%';
+}
+document.getElementById('zoomIn').addEventListener('click', ()=>{ zoom=Math.min(2, zoom+0.1); applyTransform(); });
+document.getElementById('zoomOut').addEventListener('click', ()=>{ zoom=Math.max(0.3, zoom-0.1); applyTransform(); });
+document.getElementById('zoomReset').addEventListener('click', ()=>{ zoom=1; applyTransform(); centerTree(); });
+
+const wrap = document.getElementById('canvasWrap');
+wrap.addEventListener('mousedown', (e)=>{
+  if(e.target.closest('.card')) return;
+  panState = {startX:e.clientX, startY:e.clientY, origX:pan.x, origY:pan.y};
+  wrap.style.cursor='grabbing';
+});
+window.addEventListener('mousemove', (e)=>{
+  if(!panState) return;
+  pan.x = panState.origX + (e.clientX-panState.startX);
+  pan.y = panState.origY + (e.clientY-panState.startY);
+  applyTransform();
+});
+window.addEventListener('mouseup', ()=>{ panState=null; wrap.style.cursor='default'; });
+wrap.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  zoom = Math.min(2, Math.max(0.3, zoom - e.deltaY*0.0015));
+  applyTransform();
+}, {passive:false});
+
+// basic touch pan/pinch
+let touchState=null;
+wrap.addEventListener('touchstart', (e)=>{
+  if(e.target.closest('.card')) return;
+  if(e.touches.length===1){
+    touchState={mode:'pan', startX:e.touches[0].clientX, startY:e.touches[0].clientY, origX:pan.x, origY:pan.y};
+  } else if(e.touches.length===2){
+    const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+    touchState={mode:'pinch', startDist:Math.hypot(dx,dy), startZoom:zoom};
+  }
+}, {passive:true});
+wrap.addEventListener('touchmove', (e)=>{
+  if(!touchState) return;
+  if(touchState.mode==='pan' && e.touches.length===1){
+    pan.x = touchState.origX + (e.touches[0].clientX-touchState.startX);
+    pan.y = touchState.origY + (e.touches[0].clientY-touchState.startY);
+    applyTransform();
+  } else if(touchState.mode==='pinch' && e.touches.length===2){
+    const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+    const dist=Math.hypot(dx,dy);
+    zoom = Math.min(2, Math.max(0.3, touchState.startZoom * (dist/touchState.startDist)));
+    applyTransform();
+  }
+}, {passive:true});
+wrap.addEventListener('touchend', ()=>{ touchState=null; });
+
+/* ============ Export / Import ============ */
+function computeExportScope(scopeTreeId){
+  if(!scopeTreeId) return { trees, people };
+  const scopedPeople = [];
+  const idsIncluded = new Set();
+  people.forEach(p=>{
+    if((p.treeId||'main')===scopeTreeId){ scopedPeople.push(p); idsIncluded.add(p.id); }
+  });
+  // include direct bridge spouses (one hop) so relationships don't dangle —
+  // but not the rest of THEIR tree, keeping the export scoped to just this family
+  const bridgeIds = new Set();
+  scopedPeople.forEach(p=>{
+    (p.spouses||[]).forEach(sid=>{ if(!idsIncluded.has(sid)) bridgeIds.add(sid); });
+  });
+  bridgeIds.forEach(id=>{
+    const p = personById(id);
+    if(p) scopedPeople.push(p);
+  });
+  const treeMeta = trees.find(t=>t.id===scopeTreeId);
+  return { trees: treeMeta ? [treeMeta] : DEFAULT_TREES.slice(), people: scopedPeople };
+}
+
+async function exportData(scopeTreeId){
+  toast('正在打包导出…');
+  try{
+    const zip = new JSZip();
+    const { trees: exportTrees, people: exportPeople } = computeExportScope(scopeTreeId);
+    const payload = { trees: exportTrees, people: exportPeople };
+    zip.file('data.json', JSON.stringify(payload, null, 2));
+
+    const photoIds = new Set();
+    exportPeople.forEach(p=>{ if(p.photoId) photoIds.add(p.photoId); });
+    const photosFolder = zip.folder('photos');
+    for(const photoId of photoIds){
+      try{
+        const blob = await getPhotoBlob(photoId);
+        if(blob) photosFolder.file(photoId + '.jpg', blob);
+      }catch(e){}
+    }
+
+    const zipBlob = await zip.generateAsync({type:'blob'});
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    const label = scopeTreeId ? (exportTrees[0].name || '家族树').replace(/[\\/:*?"<>|]+/g,'-') : 'family-tree';
+    a.href = url; a.download = label + '-' + new Date().toISOString().slice(0,10) + '.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('已导出 ZIP 文件（含照片）');
+  }catch(err){
+    toast('导出失败：' + err.message);
+  }
+}
+
+async function applyImportedData(data){
+  if(Array.isArray(data)){
+    // legacy format: a plain people array, single tree
+    people = data;
+    trees = DEFAULT_TREES.slice();
+    currentTreeId = 'main';
+  } else if(data && Array.isArray(data.people)){
+    people = data.people;
+    trees = (data.trees && data.trees.length) ? data.trees : DEFAULT_TREES.slice();
+    currentTreeId = trees[0].id;
+  } else {
+    throw new Error('格式错误');
+  }
+  await migrateLegacyPhotos(); // in case the imported JSON still has old base64 photo fields
+  selectedId = null;
+  focusPersonId = null;
+  saveData(); renderTreeSelect(); render(); renderSidePanel(); centerTree();
+  toast('导入成功，共 ' + people.length + ' 位成员');
+}
+
+function importData(file){
+  pushHistory();
+  const isZip = file.name.toLowerCase().endsWith('.zip');
+  if(isZip){
+    JSZip.loadAsync(file).then(async (zip)=>{
+      const dataFile = zip.file('data.json');
+      if(!dataFile) throw new Error('压缩包内找不到 data.json');
+      const jsonText = await dataFile.async('string');
+      const data = JSON.parse(jsonText);
+      // restore photos into IndexedDB before applying data, so photoCache is ready by render time
+      const photoJobs = [];
+      zip.folder('photos').forEach((relPath, fileEntry)=>{
+        photoJobs.push((async ()=>{
+          const blob = await fileEntry.async('blob');
+          const photoId = relPath.replace(/\.[a-zA-Z0-9]+$/, '');
+          await putPhotoBlob(photoId, blob);
+          photoCache[photoId] = URL.createObjectURL(blob);
+        })());
+      });
+      await Promise.all(photoJobs);
+      await applyImportedData(data);
+    }).catch(err=>{
+      toast('导入失败：' + (err.message || '文件格式不正确'));
+    });
+  } else {
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try{
+        const data = JSON.parse(e.target.result);
+        applyImportedData(data);
+      }catch(err){
+        toast('导入失败：文件格式不正确');
+      }
+    };
+    reader.readAsText(file);
+  }
+}
+
+/* ============ Wire up UI ============ */
+document.getElementById('addRootBtn').addEventListener('click', ()=>openModal(null));
+document.getElementById('emptyAddBtn').addEventListener('click', ()=>openModal(null));
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('cancelBtn').addEventListener('click', closeModal);
+document.getElementById('saveBtn').addEventListener('click', saveModal);
+document.getElementById('modalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='modalOverlay') closeModal(); });
+document.getElementById('searchInput').addEventListener('input', handleSearch);
+document.addEventListener('click', (e)=>{
+  if(!e.target.closest('.search-wrap')) document.getElementById('searchResults').classList.remove('show');
+});
+document.getElementById('fPhoto').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const blob = await resizeImageToBlob(file);
+    const photoId = uid();
+    await putPhotoBlob(photoId, blob);
+    const objectUrl = URL.createObjectURL(blob);
+    photoCache[photoId] = objectUrl;
+    modalPhotoId = photoId;
+    document.getElementById('photoPreview').innerHTML = `<img src="${objectUrl}">`;
+  }catch(err){
+    toast('照片处理失败，请换一张试试');
+  }
+});
+document.getElementById('parentQuickAdd').addEventListener('click', ()=>{
+  const input = document.getElementById('parentQuickName');
+  quickAddPerson(input.value, 'parentsSelect', 4);
+  input.value='';
+});
+document.getElementById('parentQuickName').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){ e.preventDefault(); document.getElementById('parentQuickAdd').click(); }
+});
+document.getElementById('spouseQuickAdd').addEventListener('click', ()=>{
+  const input = document.getElementById('spouseQuickName');
+  quickAddPerson(input.value, 'spousesSelect', 99);
+  input.value='';
+});
+document.getElementById('spouseQuickName').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){ e.preventDefault(); document.getElementById('spouseQuickAdd').click(); }
+});
+document.getElementById('mapBtn').addEventListener('click', ()=>{
+  renderMapView();
+  document.getElementById('mapOverlay').classList.add('show');
+});
+document.getElementById('mapHubSelect').addEventListener('change', (e)=>{
+  mapHubCountry = e.target.value || null;
+  renderMapView();
+});
+document.getElementById('mapClose').addEventListener('click', ()=>{
+  document.getElementById('mapOverlay').classList.remove('show');
+});
+document.getElementById('mapOverlay').addEventListener('click', (e)=>{
+  if(e.target.id==='mapOverlay') document.getElementById('mapOverlay').classList.remove('show');
+});
+document.getElementById('mapCanvasOuter').addEventListener('click', (e)=>{
+  if(!e.target.closest('.map-pin') && !e.target.closest('.map-popover')){
+    const pop = document.querySelector('#mapCanvasOuter .map-popover');
+    if(pop) pop.remove();
+  }
+});
+document.getElementById('helpBtn').addEventListener('click', ()=>{
+  document.getElementById('helpOverlay').classList.add('show');
+});
+document.getElementById('helpClose').addEventListener('click', ()=>{
+  document.getElementById('helpOverlay').classList.remove('show');
+});
+document.getElementById('helpOverlay').addEventListener('click', (e)=>{
+  if(e.target.id==='helpOverlay') document.getElementById('helpOverlay').classList.remove('show');
+});
+document.getElementById('undoBtn').addEventListener('click', undo);
+document.addEventListener('keydown', (e)=>{
+  const key = e.key ? e.key.toLowerCase() : '';
+  if((e.ctrlKey||e.metaKey) && key==='z' && !e.shiftKey){
+    const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+    if(tag==='input' || tag==='textarea') return; // let normal text-field undo work
+    e.preventDefault();
+    undo();
+  }
+});
+document.getElementById('treeSelect').addEventListener('change', (e)=>switchTree(e.target.value));
+document.getElementById('moveTreeClose').addEventListener('click', ()=>document.getElementById('moveTreeOverlay').classList.remove('show'));
+document.getElementById('moveTreeCancel').addEventListener('click', ()=>document.getElementById('moveTreeOverlay').classList.remove('show'));
+document.getElementById('moveTreeConfirm').addEventListener('click', confirmMoveTree);
+document.getElementById('moveTreeOverlay').addEventListener('click', (e)=>{
+  if(e.target.id==='moveTreeOverlay') document.getElementById('moveTreeOverlay').classList.remove('show');
+});
+document.getElementById('addTreeBtn').addEventListener('click', addNewTree);
+document.getElementById('renameTreeBtn').addEventListener('click', renameCurrentTree);
+document.getElementById('navBackBtn').addEventListener('click', navBack);
+document.getElementById('navForwardBtn').addEventListener('click', navForward);
+document.getElementById('exitFocusBtn').addEventListener('click', exitFocus);
+document.querySelectorAll('[data-focus-adjust]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    adjustFocusGen(btn.dataset.focusAdjust, parseInt(btn.dataset.delta, 10));
+  });
+});
+document.getElementById('hiddenBtn').addEventListener('click', ()=>{
+  document.getElementById('filterSearch').value = '';
+  renderHiddenPanel();
+  document.getElementById('hiddenOverlay').classList.add('show');
+});
+document.getElementById('hiddenClose').addEventListener('click', ()=>{
+  document.getElementById('hiddenOverlay').classList.remove('show');
+});
+document.getElementById('hiddenOverlay').addEventListener('click', (e)=>{
+  if(e.target.id==='hiddenOverlay') document.getElementById('hiddenOverlay').classList.remove('show');
+});
+document.getElementById('filterSearch').addEventListener('input', renderHiddenPanel);
+document.getElementById('filterShowAll').addEventListener('click', ()=>setAllVisible(true));
+document.getElementById('filterHideAll').addEventListener('click', ()=>setAllVisible(false));
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const sel = document.getElementById('exportScopeSelect');
+  sel.innerHTML = '<option value="">全部家族树（所有树打包在一起）</option>' +
+    trees.map(t=>`<option value="${t.id}">仅：${escapeHtml(t.name)}</option>`).join('');
+  document.getElementById('exportOverlay').classList.add('show');
+});
+document.getElementById('exportClose').addEventListener('click', ()=>{
+  document.getElementById('exportOverlay').classList.remove('show');
+});
+document.getElementById('exportCancel').addEventListener('click', ()=>{
+  document.getElementById('exportOverlay').classList.remove('show');
+});
+document.getElementById('exportConfirm').addEventListener('click', ()=>{
+  const scopeTreeId = document.getElementById('exportScopeSelect').value || null;
+  document.getElementById('exportOverlay').classList.remove('show');
+  exportData(scopeTreeId);
+});
+document.getElementById('exportOverlay').addEventListener('click', (e)=>{
+  if(e.target.id==='exportOverlay') document.getElementById('exportOverlay').classList.remove('show');
+});
+document.getElementById('importBtn').addEventListener('click', ()=>document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', (e)=>{
+  if(e.target.files[0]) importData(e.target.files[0]);
+  e.target.value='';
+});
+window.addEventListener('resize', ()=>requestAnimationFrame(drawConnectors));
+
+/* ============ Init ============ */
+(async function init(){
+  const data = await loadData();
+  people = data.people;
+  trees = data.trees;
+  currentTreeId = data.currentTreeId;
+  const countryList = document.getElementById('countryList');
+  if(countryList) countryList.innerHTML = Object.keys(COUNTRY_COORDS).sort().map(c=>`<option value="${c}">`).join('');
+  await loadAllPhotosIntoCache();
+  await migrateLegacyPhotos();
+  renderTreeSelect();
+  render();
+  renderSidePanel();
+  centerTree();
+  recordNavState();
+})();
+
+// Register the service worker so the app shell can be cached for offline
+// use. Registration only makes sense when served over http(s) (GitHub
+// Pages, or any static host) — it's silently skipped if opened directly as
+// a local file:// page, since service workers require a proper origin.
+if('serviceWorker' in navigator && location.protocol!=='file:'){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./service-worker.js').catch((err)=>{
+      console.warn('Service worker registration failed:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>

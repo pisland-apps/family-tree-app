@@ -1,0 +1,15 @@
+{
+  "name": "家谱 · 家族树",
+  "short_name": "家谱",
+  "description": "多家族树家谱管理应用 —— 支持父母/配偶/子女关系、聚焦查看、家族分布地图、离线使用",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F6F1E4",
+  "theme_color": "#3F6656",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
