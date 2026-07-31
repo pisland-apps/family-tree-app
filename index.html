@@ -703,7 +703,7 @@ input[type=file]{font-size:12px;}
     </button>
     <button class="btn btn-ghost" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span class="label">导出</span></button>
     <button class="btn btn-ghost" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V9m0 0 4 4m-4-4-4 4M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/></svg><span class="label">导入</span></button>
-    <input type="file" id="importFile" accept=".json,.zip" style="display:none">
+    <input type="file" id="importFile" accept=".json,.zip,.ftenc" style="display:none">
   </div>
 </div>
 
@@ -864,6 +864,23 @@ input[type=file]{font-size:12px;}
         </select>
       </div>
       <p class="hint">单独导出某一棵树时，会包含这棵树本身的成员，以及跟他们联姻的"桥梁"配偶（这样关系还能正常显示），但不会带上配偶自己那棵树的其余亲属——方便只把这一支的资料分享给对应的家族成员。</p>
+      <div class="field" style="margin-top:4px;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="exportEncryptToggle" style="width:auto;">
+          <span>加密导出（用密码保护这个 ZIP，和 App 锁密码无关，可自由设置）</span>
+        </label>
+      </div>
+      <div id="exportEncryptFields" style="display:none;">
+        <div class="field">
+          <label>设置导出密码</label>
+          <input type="password" id="exportPasscodeInput" placeholder="密码（至少4位）" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label>确认密码</label>
+          <input type="password" id="exportPasscodeConfirmInput" placeholder="再输入一次确认" autocomplete="new-password">
+        </div>
+        <p class="hint">这个密码只用来保护这一份导出文件，请自己记好——忘记了任何人都无法恢复里面的数据。导出的文件会是 <b>.ftenc</b> 格式，导入时需要输入同一个密码。</p>
+      </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" id="exportCancel">取消</button>
         <button class="btn btn-primary" id="exportConfirm">导出</button>
@@ -961,8 +978,8 @@ input[type=file]{font-size:12px;}
       <div class="help-section">
         <h3>导出与导入</h3>
         <ul>
-          <li>"导出"会打包成一个 <b>.zip</b> 文件，里面包含数据和所有照片，方便备份或换设备使用。</li>
-          <li>"导入"支持 .zip（含照片）或旧版 .json（不含照片）文件。</li>
+          <li>"导出"会打包成一个 <b>.zip</b> 文件，里面包含数据和所有照片，方便备份或换设备使用。也可以勾选"加密导出"，自己设置一个密码，导出的文件会变成 <b>.ftenc</b> 格式——和 App 锁密码无关，只有知道这个密码的人才能打开。</li>
+          <li>"导入"支持 .zip（含照片）、加密的 .ftenc 文件（导入时会要求输入导出密码），或旧版 .json（不含照片）文件。</li>
           <li>照片存在浏览器本地，不会跨设备同步——建议定期导出备份。</li>
         </ul>
       </div>
@@ -3159,7 +3176,37 @@ function computeExportScope(scopeTreeId){
   return { trees: treeMeta ? [treeMeta] : DEFAULT_TREES.slice(), people: scopedPeople };
 }
 
-async function exportData(scopeTreeId){
+/* ---- Standalone export encryption (separate from the app-lock passcode) ----
+   Envelope layout: magic bytes "FTZENC1\n" (8) + salt (16) + iv (12) + AES-GCM ciphertext.
+   Uses the same PBKDF2 + AES-GCM primitives as the app lock, but with its own
+   password chosen at export time — decrypting an export never requires or
+   reveals the app-lock passcode. */
+const EXPORT_ENC_MAGIC = new TextEncoder().encode('FTZENC1\n'); // 8 bytes
+async function encryptExportBytes(passcode, plainBytes){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveKeyFromPasscode(passcode, salt);
+  const combined = await encryptBytes(key, plainBytes); // iv(12) + ciphertext
+  const out = new Uint8Array(EXPORT_ENC_MAGIC.length + salt.length + combined.length);
+  out.set(EXPORT_ENC_MAGIC, 0);
+  out.set(salt, EXPORT_ENC_MAGIC.length);
+  out.set(combined, EXPORT_ENC_MAGIC.length + salt.length);
+  return out;
+}
+async function decryptExportBytes(passcode, envelopeBytes){
+  const magic = envelopeBytes.slice(0, EXPORT_ENC_MAGIC.length);
+  const isKnown = magic.length===EXPORT_ENC_MAGIC.length && magic.every((b,i)=>b===EXPORT_ENC_MAGIC[i]);
+  if(!isKnown) throw new Error('不是加密的导出文件');
+  const salt = envelopeBytes.slice(EXPORT_ENC_MAGIC.length, EXPORT_ENC_MAGIC.length+16);
+  const combined = envelopeBytes.slice(EXPORT_ENC_MAGIC.length+16);
+  const key = await deriveKeyFromPasscode(passcode, salt);
+  try{
+    return await decryptBytes(key, combined); // throws if passcode is wrong (AES-GCM auth tag check)
+  }catch(e){
+    throw new Error('密码错误，无法解密');
+  }
+}
+
+async function exportData(scopeTreeId, encryptPasscode){
   toast('正在打包导出…');
   try{
     const zip = new JSZip();
@@ -3178,13 +3225,26 @@ async function exportData(scopeTreeId){
     }
 
     const zipBlob = await zip.generateAsync({type:'blob'});
-    const url = URL.createObjectURL(zipBlob);
-    const a = document.createElement('a');
     const label = scopeTreeId ? (exportTrees[0].name || '家族树').replace(/[\\/:*?"<>|]+/g,'-') : 'family-tree';
-    a.href = url; a.download = label + '-' + new Date().toISOString().slice(0,10) + '.zip';
+    const dateStr = new Date().toISOString().slice(0,10);
+
+    let outBlob, filename;
+    if(encryptPasscode){
+      const zipBytes = new Uint8Array(await zipBlob.arrayBuffer());
+      const envelope = await encryptExportBytes(encryptPasscode, zipBytes);
+      outBlob = new Blob([envelope], {type:'application/octet-stream'});
+      filename = label + '-' + dateStr + '.ftenc';
+    } else {
+      outBlob = zipBlob;
+      filename = label + '-' + dateStr + '.zip';
+    }
+
+    const url = URL.createObjectURL(outBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    toast('已导出 ZIP 文件（含照片）');
+    toast(encryptPasscode ? '已导出加密文件（含照片）' : '已导出 ZIP 文件（含照片）');
   }catch(err){
     toast('导出失败：' + err.message);
   }
@@ -3210,28 +3270,44 @@ async function applyImportedData(data){
   toast('导入成功，共 ' + people.length + ' 位成员');
 }
 
+async function importZipBytes(zipBytesOrFile){
+  const zip = await JSZip.loadAsync(zipBytesOrFile);
+  const dataFile = zip.file('data.json');
+  if(!dataFile) throw new Error('压缩包内找不到 data.json');
+  const jsonText = await dataFile.async('string');
+  const data = JSON.parse(jsonText);
+  // restore photos into IndexedDB before applying data, so photoCache is ready by render time
+  const photoJobs = [];
+  const photosFolder = zip.folder('photos');
+  if(photosFolder){
+    photosFolder.forEach((relPath, fileEntry)=>{
+      photoJobs.push((async ()=>{
+        const blob = await fileEntry.async('blob');
+        const photoId = relPath.replace(/\.[a-zA-Z0-9]+$/, '');
+        await putPhotoBlob(photoId, blob);
+        photoCache[photoId] = URL.createObjectURL(blob);
+      })());
+    });
+  }
+  await Promise.all(photoJobs);
+  await applyImportedData(data);
+}
+
 function importData(file){
   pushHistory();
-  const isZip = file.name.toLowerCase().endsWith('.zip');
-  if(isZip){
-    JSZip.loadAsync(file).then(async (zip)=>{
-      const dataFile = zip.file('data.json');
-      if(!dataFile) throw new Error('压缩包内找不到 data.json');
-      const jsonText = await dataFile.async('string');
-      const data = JSON.parse(jsonText);
-      // restore photos into IndexedDB before applying data, so photoCache is ready by render time
-      const photoJobs = [];
-      zip.folder('photos').forEach((relPath, fileEntry)=>{
-        photoJobs.push((async ()=>{
-          const blob = await fileEntry.async('blob');
-          const photoId = relPath.replace(/\.[a-zA-Z0-9]+$/, '');
-          await putPhotoBlob(photoId, blob);
-          photoCache[photoId] = URL.createObjectURL(blob);
-        })());
-      });
-      await Promise.all(photoJobs);
-      await applyImportedData(data);
+  const lowerName = file.name.toLowerCase();
+  if(lowerName.endsWith('.ftenc')){
+    const passcode = prompt('这是一个加密导出文件，请输入导出时设置的密码：');
+    if(!passcode){ toast('已取消导入'); return; }
+    file.arrayBuffer().then(async (buf)=>{
+      const envelopeBytes = new Uint8Array(buf);
+      const zipBytes = await decryptExportBytes(passcode, envelopeBytes);
+      await importZipBytes(zipBytes);
     }).catch(err=>{
+      toast('导入失败：' + (err.message || '密码错误或文件已损坏'));
+    });
+  } else if(lowerName.endsWith('.zip')){
+    importZipBytes(file).catch(err=>{
       toast('导入失败：' + (err.message || '文件格式不正确'));
     });
   } else {
@@ -3414,10 +3490,26 @@ document.getElementById('exportClose').addEventListener('click', ()=>{
 document.getElementById('exportCancel').addEventListener('click', ()=>{
   document.getElementById('exportOverlay').classList.remove('show');
 });
+document.getElementById('exportEncryptToggle').addEventListener('change', (e)=>{
+  document.getElementById('exportEncryptFields').style.display = e.target.checked ? '' : 'none';
+});
 document.getElementById('exportConfirm').addEventListener('click', ()=>{
   const scopeTreeId = document.getElementById('exportScopeSelect').value || null;
+  const wantsEncrypt = document.getElementById('exportEncryptToggle').checked;
+  let encryptPasscode = null;
+  if(wantsEncrypt){
+    const pass = document.getElementById('exportPasscodeInput').value;
+    const confirmPass = document.getElementById('exportPasscodeConfirmInput').value;
+    if(!pass || pass.length < 4){ toast('导出密码至少需要4位'); return; }
+    if(pass !== confirmPass){ toast('两次输入的密码不一致'); return; }
+    encryptPasscode = pass;
+  }
   document.getElementById('exportOverlay').classList.remove('show');
-  exportData(scopeTreeId);
+  exportData(scopeTreeId, encryptPasscode);
+  document.getElementById('exportPasscodeInput').value = '';
+  document.getElementById('exportPasscodeConfirmInput').value = '';
+  document.getElementById('exportEncryptToggle').checked = false;
+  document.getElementById('exportEncryptFields').style.display = 'none';
 });
 document.getElementById('exportOverlay').addEventListener('click', (e)=>{
   if(e.target.id==='exportOverlay') document.getElementById('exportOverlay').classList.remove('show');
