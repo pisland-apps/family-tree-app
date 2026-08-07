@@ -1,14 +1,15 @@
 # 家谱 · 家族树 (Family Tree)
 
-一个纯前端、单文件为主的家谱管理应用：多家族树、父母/配偶/子女关系（含继父母、一夫多妻等特殊情况）、拖拽调整顺序、收起/展开、聚焦查看、家族分布地图、撤销/前进后退、ZIP 导出导入（含照片）。
+一个纯前端的家谱管理应用：多家族树、父母/配偶/子女关系（含继父母、一夫多妻等特殊情况）、拖拽调整顺序、收起/展开、聚焦查看、家族分布地图、撤销/前进后退、ZIP 导出导入（含照片）。
 
-支持离线使用（Service Worker）和可安装为桌面/手机应用（PWA）。
+支持离线使用（Service Worker）和可安装为桌面/手机应用（PWA）。已按 [CSP-HARDENING-PLAYBOOK.md] 加固：严格 CSP、外部 `app.js`（不用内联脚本 hash 锁定）、CDN 脚本 SRI 校验、`id`/照片字段一律转义防属性注入 XSS。
 
 ## 目录结构
 
 ```
 family-tree-app/
-├── index.html          主应用（所有界面和逻辑都在这一个文件里）
+├── index.html          主应用界面（含 CSP meta 标签），逻辑已拆到 app.js
+├── app.js               应用逻辑（拆分出来是为了让 CSP 能禁用内联脚本，见下方"部署须知"）
 ├── manifest.json        PWA 配置（应用名称、图标、主题色）
 ├── service-worker.js     离线缓存
 ├── icons/
@@ -16,6 +17,12 @@ family-tree-app/
 │   └── icon-512.png
 └── README.md
 ```
+
+## 部署须知（重要）
+
+- **`index.html` 和 `app.js` 必须一起部署**，只传 `index.html` 会导致白屏（浏览器加载不到脚本，且 CSP 不允许内联回退）。
+- 本应用通过 `<meta http-equiv="Content-Security-Policy">` 设置了严格 CSP。**`frame-ancestors` 无法通过 `<meta>` 生效**（浏览器只认 HTTP 响应头设置的这个指令），GitHub Pages 不支持自定义响应头，所以点击劫持防护在这个部署方式下无法强制生效——如果这一点对你很重要，需要换到支持自定义响应头的托管（如 Cloudflare Pages / Netlify 的 `_headers` 文件）。
+- 请用本地 HTTP 服务器测试（如 `python3 -m http.server 8000`），不要用双击打开文件的方式（`file://` 协议下 `'self'` 的同源判断会失真，导致本来没问题的资源被 CSP 拦掉）。
 
 ## 部署到 GitHub Pages
 
