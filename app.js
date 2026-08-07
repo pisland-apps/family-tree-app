@@ -1,3 +1,15 @@
+/* ============ App version (shown in the small badge, bottom-right) ============
+   Bump this on every deploy alongside CACHE_VERSION in service-worker.js —
+   they're independent strings in separate files, nothing keeps them in sync
+   automatically. This one is just for you to visually confirm you're on the
+   latest build; it has no effect on caching. */
+const APP_VERSION = 'v6';
+const APP_VERSION_DATE = '2026-08-08';
+(function initVersionBadge(){
+  const el = document.getElementById('versionBadge');
+  if(el) el.textContent = `${APP_VERSION} · ${APP_VERSION_DATE}`;
+})();
+
 /* ============ App lock (PBKDF2 + AES-GCM via Web Crypto) ============ */
 const LOCK_STORE_KEY = 'family-tree-lock-v1'; // holds only salt + a verifier, never the passcode itself
 const PBKDF2_ITERATIONS = 210000;
