@@ -2245,18 +2245,70 @@ async function importZipBytes(zipBytesOrFile){
   await applyImportedData(data);
 }
 
+function promptImportPasscode(){
+  return new Promise((resolve)=>{
+    const overlay = document.getElementById('importPasscodeOverlay');
+    const input = document.getElementById('importPasscodeInput');
+    const closeBtn = document.getElementById('importPasscodeClose');
+    const cancelBtn = document.getElementById('importPasscodeCancel');
+    const confirmBtn = document.getElementById('importPasscodeConfirm');
+
+    let settled = false;
+    function cleanup(){
+      overlay.classList.remove('show');
+      input.value = '';
+      closeBtn.removeEventListener('click', onCancel);
+      cancelBtn.removeEventListener('click', onCancel);
+      confirmBtn.removeEventListener('click', onConfirm);
+      overlay.removeEventListener('click', onOverlayClick);
+      input.removeEventListener('keydown', onKeydown);
+    }
+    function onCancel(){
+      if(settled) return;
+      settled = true;
+      cleanup();
+      resolve(null);
+    }
+    function onConfirm(){
+      if(settled) return;
+      settled = true;
+      const val = input.value;
+      cleanup();
+      resolve(val || null);
+    }
+    function onOverlayClick(e){
+      if(e.target === overlay) onCancel();
+    }
+    function onKeydown(e){
+      if(e.key === 'Enter') onConfirm();
+      else if(e.key === 'Escape') onCancel();
+    }
+
+    closeBtn.addEventListener('click', onCancel);
+    cancelBtn.addEventListener('click', onCancel);
+    confirmBtn.addEventListener('click', onConfirm);
+    overlay.addEventListener('click', onOverlayClick);
+    input.addEventListener('keydown', onKeydown);
+
+    overlay.classList.add('show');
+    input.focus();
+  });
+}
+
 function importData(file){
   pushHistory();
   const lowerName = file.name.toLowerCase();
   if(lowerName.endsWith('.ftenc')){
-    const passcode = prompt('这是一个加密导出文件，请输入导出时设置的密码：');
-    if(!passcode){ toast('已取消导入'); return; }
-    file.arrayBuffer().then(async (buf)=>{
-      const envelopeBytes = new Uint8Array(buf);
-      const zipBytes = await decryptExportBytes(passcode, envelopeBytes);
-      await importZipBytes(zipBytes);
-    }).catch(err=>{
-      toast('导入失败：' + (err.message || '密码错误或文件已损坏'));
+    promptImportPasscode().then(async (passcode)=>{
+      if(!passcode){ toast('已取消导入'); return; }
+      try{
+        const buf = await file.arrayBuffer();
+        const envelopeBytes = new Uint8Array(buf);
+        const zipBytes = await decryptExportBytes(passcode, envelopeBytes);
+        await importZipBytes(zipBytes);
+      }catch(err){
+        toast('导入失败：' + (err.message || '密码错误或文件已损坏'));
+      }
     });
   } else if(lowerName.endsWith('.zip')){
     importZipBytes(file).catch(err=>{

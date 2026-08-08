@@ -875,6 +875,26 @@ input[type=file]{font-size:12px;}
   </div>
 </div>
 
+<div class="modal-overlay" id="importPasscodeOverlay">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <h2>输入导出密码</h2>
+      <button class="modal-close" id="importPasscodeClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="hint">这是一个加密导出文件，请输入导出时设置的密码：</p>
+      <div class="field">
+        <label>密码</label>
+        <input type="password" id="importPasscodeInput" placeholder="密码" autocomplete="current-password">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="importPasscodeCancel">取消</button>
+        <button class="btn btn-primary" id="importPasscodeConfirm">导入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="exportOverlay">
   <div class="modal" style="max-width:400px;">
     <div class="modal-header">
