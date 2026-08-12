@@ -8,7 +8,7 @@
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   img-src 'self' data: blob:;
   font-src 'self' https://fonts.gstatic.com;
-  connect-src 'self' https://cdn.jsdelivr.net https://cdn.statically.io;
+  connect-src 'self';
   frame-src 'none';
   worker-src 'self';
   manifest-src 'self';
@@ -672,7 +672,7 @@ input[type=file]{font-size:12px;}
     <h2 id="lockTitle">设置访问密码</h2>
     <p class="lock-subtitle" id="lockSubtitle">这个密码只保存在你自己的设备本地推导出的密钥里，我们不会上传、也无法帮你找回——请务必牢记。</p>
     <div class="field">
-      <input type="password" id="lockPasscodeInput" placeholder="密码（至少4位）" autocomplete="new-password">
+      <input type="password" id="lockPasscodeInput" placeholder="密码（至少6位）" autocomplete="new-password">
     </div>
     <div class="field" id="lockConfirmField">
       <input type="password" id="lockConfirmInput" placeholder="再输入一次确认" autocomplete="new-password">
@@ -918,7 +918,7 @@ input[type=file]{font-size:12px;}
       <div id="exportEncryptFields" style="display:none;">
         <div class="field">
           <label>设置导出密码</label>
-          <input type="password" id="exportPasscodeInput" placeholder="密码（至少4位）" autocomplete="new-password">
+          <input type="password" id="exportPasscodeInput" placeholder="密码（至少6位）" autocomplete="new-password">
         </div>
         <div class="field">
           <label>确认密码</label>

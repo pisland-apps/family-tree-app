@@ -52,11 +52,12 @@ family-tree-app/
 
 ## 关于外部资源
 
-应用运行时会从公开 CDN 加载两样东西（可以正常联网时才会用到）：
-- [JSZip](https://cdnjs.cloudflare.com)：导出/导入 ZIP 文件用。
-- [flekschas/simple-world-map](https://github.com/flekschas/simple-world-map)（CC BY-SA 协议）：家族分布地图用的世界地图。
+应用运行时只有一样东西还依赖公开 CDN（可以正常联网时才会用到）：
+- [JSZip](https://cdnjs.cloudflare.com)：导出/导入 ZIP 文件用，带 SRI 完整性校验。
 
-如果打开时没有网络，导出导入功能和"真实世界地图"会暂时用不了或自动退回到简化版本，但家谱树本身的浏览、编辑、拖拽等核心功能不受影响（配合 Service Worker，首次联网访问后，这些外部资源大多也会被缓存下来供离线使用）。
+家族分布地图用的世界地图 SVG（[flekschas/simple-world-map](https://github.com/flekschas/simple-world-map)，CC BY-SA 协议）现在**打包在应用内**（`assets/world-map.svg`），不再从 CDN 的 `@master`（可变引用，内容随时可能变化且无完整性校验）实时拉取。这样一次改动即可避免"上游仓库或 CDN 被篡改后应用会不加验证地渲染新内容"的风险，也省去了打开地图视图时向第三方 CDN 发起请求（连带暴露访问者 IP）的问题。地图版权归属仍保留在地图视图的角标里。
+
+如果打开时没有网络，导出导入功能会暂时用不了，但家谱树浏览/编辑/拖拽和家族分布地图（含世界地图底图）都不受影响，因为这些都是本地资源，会被 Service Worker 预缓存。
 
 ## 更新须知（重要）
 

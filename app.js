@@ -3,8 +3,8 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v7';
-const APP_VERSION_DATE = '2026-08-08';
+const APP_VERSION = 'v7.1';
+const APP_VERSION_DATE = '2026-08-12';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
   if(el) el.textContent = `${APP_VERSION} · ${APP_VERSION_DATE}`;
@@ -297,11 +297,24 @@ function personById(id){ return people.find(p=>p.id===id); }
 function childrenOf(id){
   return people.filter(p => p.parents && p.parents.includes(id));
 }
+function findCardEl(root, id){
+  // Looks up a rendered person card by id via dataset comparison rather than
+  // building a CSS attribute-selector string (`.card[data-id="'+id+'"]'`).
+  // Ids are internally generated, but imported ZIP data isn't schema-validated,
+  // so a crafted id containing a `"` could otherwise break the selector.
+  if(!root) return null;
+  const cards = root.querySelectorAll('.card');
+  for(const el of cards){ if(el.dataset.id === id) return el; }
+  return null;
+}
 function initials(name){
   if(!name) return '?';
   const parts = name.trim().split(/\s+/);
-  if(parts.length===1) return parts[0].slice(0,1);
-  return parts[0].slice(0,1)+parts[parts.length-1].slice(0,1);
+  const raw = parts.length===1 ? parts[0].slice(0,1) : parts[0].slice(0,1)+parts[parts.length-1].slice(0,1);
+  // Always escaped at the source: initials() is interpolated directly into
+  // innerHTML at several call sites, so it must never depend on callers
+  // remembering to wrap it themselves.
+  return escapeHtml(raw);
 }
 function yearsLabel(p){
   if(!p.birth && !p.death) return '';
@@ -996,7 +1009,7 @@ function render(){
       // record each member's actual final position for the next row to align against
       const canvasRect2 = canvas.getBoundingClientRect();
       run.forEach(m=>{
-        const cardEl = el.querySelector('.card[data-id="'+m.id+'"]');
+        const cardEl = findCardEl(el, m.id);
         if(cardEl){
           const cr = cardEl.getBoundingClientRect();
           measuredX[m.id] = (cr.left - canvasRect2.left) + cr.width/2;
@@ -1084,7 +1097,7 @@ function drawConnectors(){
   svg.setAttribute('height', canvas.scrollHeight);
 
   function cardRect(id){
-    const el = canvas.querySelector('.card[data-id="'+id+'"]');
+    const el = findCardEl(canvas, id);
     if(!el) return null;
     const r = el.getBoundingClientRect();
     // r is already scaled by the canvas's own CSS transform (scale(zoom)).
@@ -1107,8 +1120,8 @@ function drawConnectors(){
       const key = [p.id,sid].sort().join('|');
       if(drawnPairs.has(key)) return;
       drawnPairs.add(key);
-      const elA = canvas.querySelector('.card[data-id="'+p.id+'"]');
-      const elB = canvas.querySelector('.card[data-id="'+sid+'"]');
+      const elA = findCardEl(canvas, p.id);
+      const elB = findCardEl(canvas, sid);
       if(elA && elB && elA.parentElement===elB.parentElement && elA.parentElement.classList.contains('couple-card')){
         return; // already visually joined into one merged card, no need for a duplicate line
       }
@@ -1269,7 +1282,7 @@ function enterFocus(id){
 function centerOnPerson(id){
   requestAnimationFrame(()=>{
     const wrap = document.getElementById('canvasWrap');
-    const el = document.querySelector('.card[data-id="'+id+'"]');
+    const el = findCardEl(document, id);
     if(!wrap || !el){ centerTree(); return; }
     const wrapRect = wrap.getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
@@ -1481,24 +1494,21 @@ let mapHubCountry = null; // user-chosen country to draw root-style connector li
 let worldMapSVGText = null; // cached after first successful load
 let worldMapLoadAttempted = false;
 async function loadWorldMapSVG(){
+  // Bundled locally (assets/world-map.svg) instead of fetched from a mutable
+  // CDN @master ref, so there's nothing to verify at runtime and no
+  // third-party request is made just to open the map view.
   if(worldMapSVGText || worldMapLoadAttempted) return worldMapSVGText;
   worldMapLoadAttempted = true;
-  const sources = [
-    'https://cdn.jsdelivr.net/gh/flekschas/simple-world-map@master/world-map.min.svg',
-    'https://cdn.statically.io/gh/flekschas/simple-world-map/master/world-map.min.svg',
-  ];
-  for(const url of sources){
-    try{
-      const res = await fetch(url);
-      if(res.ok){
-        const text = await res.text();
-        if(text.includes('<svg') && text.includes('<path')){
-          worldMapSVGText = text;
-          return worldMapSVGText;
-        }
+  try{
+    const res = await fetch('./assets/world-map.svg');
+    if(res.ok){
+      const text = await res.text();
+      if(text.includes('<svg') && text.includes('<path')){
+        worldMapSVGText = text;
+        return worldMapSVGText;
       }
-    }catch(e){ /* try next source */ }
-  }
+    }
+  }catch(e){ /* asset missing or unreadable */ }
   return null;
 }
 
@@ -1782,12 +1792,12 @@ function renderSidePanel(){
   const spouses = (p.spouses||[]).map(personById).filter(Boolean);
   const kids = childrenOf(p.id);
 
-  function chip(person, label){
+  function chip(person){
     const avatarInner = person.photo ? `<img src="${escapeHtml(person.photo)}">` : initials(person.name);
     const hiddenTag = person.hidden ? '<span style="color:var(--danger);">（已隐藏）</span>' : '';
     return `<div class="rel-chip" data-goto="${escapeHtml(person.id)}">
       <div class="mini-avatar">${avatarInner}</div>
-      <div>${escapeHtml(person.name)}${label?('<span style="color:var(--ink-soft)"> · '+label+'</span>'):''}${hiddenTag}</div>
+      <div>${escapeHtml(person.name)}${hiddenTag}</div>
     </div>`;
   }
 
@@ -2202,15 +2212,85 @@ async function exportData(scopeTreeId, encryptPasscode){
   }
 }
 
+const IMPORT_LIMITS = {
+  maxPeople: 20000,
+  maxTrees: 200,
+  maxParentsPerPerson: 4,
+  maxPhotoFiles: 5000,
+  maxPhotoBytes: 15 * 1024 * 1024, // 15MB per photo file
+  allowedPhotoExt: /\.(jpe?g|png|webp|gif)$/i,
+};
+
+function importStr(v, fallback){
+  return (typeof v === 'string') ? v : (fallback===undefined ? '' : fallback);
+}
+
+// Imported data (a ZIP or .ftenc someone else sent you) is untrusted input.
+// This walks the raw JSON field-by-field, coercing wrong types to safe
+// defaults and dropping anything that isn't recognized, rather than trusting
+// the shape blindly. It can't be used for XSS (all rendering already goes
+// through escapeHtml/dataset), but malformed data — wrong types, missing
+// ids, relationship references to nobody, a runaway record count — could
+// otherwise crash rendering or hang the tab.
+function validateAndNormalizePeople(rawPeople){
+  if(!Array.isArray(rawPeople)) throw new Error('格式错误：people 字段不是数组');
+  if(rawPeople.length > IMPORT_LIMITS.maxPeople){
+    throw new Error(`导入的成员数量（${rawPeople.length}）超过上限 ${IMPORT_LIMITS.maxPeople}，请拆分后再导入`);
+  }
+  const seenIds = new Set();
+  const cleaned = [];
+  for(const raw of rawPeople){
+    if(!raw || typeof raw !== 'object') continue; // skip entries that aren't objects at all
+    let id = importStr(raw.id);
+    if(!id || seenIds.has(id)) id = uid(); // missing/duplicate id -> assign a fresh one
+    seenIds.add(id);
+    const gender = (raw.gender==='M' || raw.gender==='F') ? raw.gender : 'O';
+    cleaned.push({
+      id,
+      name: importStr(raw.name, '未命名'),
+      gender,
+      birth: importStr(raw.birth),
+      death: importStr(raw.death),
+      notes: importStr(raw.notes),
+      country: importStr(raw.country) || undefined,
+      photo: importStr(raw.photo) || null,
+      photoId: importStr(raw.photoId) || undefined,
+      parents: Array.isArray(raw.parents) ? raw.parents.filter(x=>typeof x==='string').slice(0, IMPORT_LIMITS.maxParentsPerPerson) : [],
+      spouses: Array.isArray(raw.spouses) ? raw.spouses.filter(x=>typeof x==='string') : [],
+      treeId: importStr(raw.treeId) || undefined,
+      hidden: !!raw.hidden,
+      collapsed: !!raw.collapsed,
+      orderHints: (raw.orderHints && typeof raw.orderHints==='object' && !Array.isArray(raw.orderHints)) ? raw.orderHints : undefined,
+    });
+  }
+  // Second pass: relationship ids must point at someone who actually exists
+  // in this import, or dangling references would break rendering later.
+  const validIds = new Set(cleaned.map(p=>p.id));
+  cleaned.forEach(p=>{
+    p.parents = p.parents.filter(id=>validIds.has(id));
+    p.spouses = p.spouses.filter(id=>validIds.has(id));
+  });
+  return cleaned;
+}
+
+function validateAndNormalizeTrees(rawTrees){
+  if(!Array.isArray(rawTrees) || !rawTrees.length) return DEFAULT_TREES.slice();
+  const cleaned = rawTrees
+    .slice(0, IMPORT_LIMITS.maxTrees)
+    .filter(t=>t && typeof t==='object' && typeof t.id==='string' && t.id)
+    .map(t=>({ id: t.id, name: importStr(t.name, t.id) }));
+  return cleaned.length ? cleaned : DEFAULT_TREES.slice();
+}
+
 async function applyImportedData(data){
   if(Array.isArray(data)){
     // legacy format: a plain people array, single tree
-    people = data;
+    people = validateAndNormalizePeople(data);
     trees = DEFAULT_TREES.slice();
     currentTreeId = 'main';
   } else if(data && Array.isArray(data.people)){
-    people = data.people;
-    trees = (data.trees && data.trees.length) ? data.trees : DEFAULT_TREES.slice();
+    people = validateAndNormalizePeople(data.people);
+    trees = validateAndNormalizeTrees(data.trees);
     currentTreeId = trees[0].id;
   } else {
     throw new Error('格式错误');
@@ -2231,10 +2311,23 @@ async function importZipBytes(zipBytesOrFile){
   // restore photos into IndexedDB before applying data, so photoCache is ready by render time
   const photoJobs = [];
   const photosFolder = zip.folder('photos');
+  let photoFileCount = 0, skippedPhotos = 0;
   if(photosFolder){
     photosFolder.forEach((relPath, fileEntry)=>{
+      if(fileEntry.dir) return;
+      // Guard against a malicious/corrupt zip trying to hang or crash the
+      // tab: cap how many photo entries we'll process, only accept known
+      // image extensions, and reject anything absurdly large per-file.
+      if(photoFileCount >= IMPORT_LIMITS.maxPhotoFiles){ skippedPhotos++; return; }
+      if(!IMPORT_LIMITS.allowedPhotoExt.test(relPath)){ skippedPhotos++; return; }
+      photoFileCount++;
       photoJobs.push((async ()=>{
+        // _data.uncompressedSize is populated by JSZip from the zip's local
+        // file header, so we can check size before decompressing the blob.
+        const declaredSize = fileEntry._data && fileEntry._data.uncompressedSize;
+        if(typeof declaredSize === 'number' && declaredSize > IMPORT_LIMITS.maxPhotoBytes){ skippedPhotos++; return; }
         const blob = await fileEntry.async('blob');
+        if(blob.size > IMPORT_LIMITS.maxPhotoBytes){ skippedPhotos++; return; }
         const photoId = relPath.replace(/\.[a-zA-Z0-9]+$/, '');
         await putPhotoBlob(photoId, blob);
         photoCache[photoId] = URL.createObjectURL(blob);
@@ -2243,6 +2336,9 @@ async function importZipBytes(zipBytesOrFile){
   }
   await Promise.all(photoJobs);
   await applyImportedData(data);
+  if(skippedPhotos > 0){
+    toast(`已跳过 ${skippedPhotos} 个不符合要求的照片文件（过大或格式不支持）`);
+  }
 }
 
 function promptImportPasscode(){
@@ -2424,7 +2520,7 @@ document.getElementById('cpConfirm').addEventListener('click', async ()=>{
   const confirmPass = document.getElementById('cpConfirmInput').value;
   const errEl = document.getElementById('cpError');
   errEl.style.display='none';
-  if(!newPass || newPass.length<4){ errEl.textContent='新密码至少需要4位'; errEl.style.display='block'; return; }
+  if(!newPass || newPass.length<6){ errEl.textContent='新密码至少需要6位'; errEl.style.display='block'; return; }
   if(newPass!==confirmPass){ errEl.textContent='两次输入的新密码不一致'; errEl.style.display='block'; return; }
   const btn = document.getElementById('cpConfirm');
   btn.disabled=true; btn.textContent='更改中…';
@@ -2504,7 +2600,7 @@ document.getElementById('exportConfirm').addEventListener('click', ()=>{
   if(wantsEncrypt){
     const pass = document.getElementById('exportPasscodeInput').value;
     const confirmPass = document.getElementById('exportPasscodeConfirmInput').value;
-    if(!pass || pass.length < 4){ toast('导出密码至少需要4位'); return; }
+    if(!pass || pass.length < 6){ toast('导出密码至少需要6位'); return; }
     if(pass !== confirmPass){ toast('两次输入的密码不一致'); return; }
     encryptPasscode = pass;
   }
@@ -2555,8 +2651,9 @@ function initLockGate(){
     async function attempt(){
       errorEl.style.display = 'none';
       const pass = passInput.value;
-      if(!pass || pass.length<4){ showError('密码至少需要4位'); return; }
+      if(!pass){ showError('请输入密码'); return; }
       if(isSetup){
+        if(pass.length<6){ showError('密码至少需要6位'); return; }
         if(pass !== confirmInput.value){ showError('两次输入的密码不一致'); return; }
         submitBtn.disabled = true; submitBtn.textContent = '设置中…';
         try{

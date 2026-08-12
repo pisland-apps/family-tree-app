@@ -1,13 +1,14 @@
 // 家谱 · 家族树 —— Service Worker
 // 负责：
-// 1. 首次访问时把应用外壳（HTML/manifest/图标）缓存起来，之后离线也能打开。
-// 2. 运行时用到的外部资源（JSZip、世界地图 SVG、字体等）采用"网络优先，
-//    失败退回缓存"的策略——有网时总是拿最新的，没网时如果之前成功加载过，
-//    还能从缓存里读到。
+// 1. 首次访问时把应用外壳（HTML/manifest/图标/世界地图 SVG）缓存起来，之后离线也能打开。
+//    世界地图 SVG 现在是随应用打包的本地资源（assets/world-map.svg），
+//    不再从 CDN 拉取，因此不需要额外的完整性校验。
+// 2. 运行时仍会用到的外部资源（JSZip、字体等）采用"网络优先，失败退回缓存"
+//    的策略——有网时总是拿最新的，没网时如果之前成功加载过，还能从缓存里读到。
 // 注意：IndexedDB（用来存照片）不归 Service Worker 管，浏览器会自己持久化，
 // 不需要在这里做任何处理。
 
-const CACHE_VERSION = 'family-tree-v7'; // bump alongside APP_VERSION in app.js on every deploy
+const CACHE_VERSION = 'family-tree-v7.1'; // bump alongside APP_VERSION in app.js on every deploy
 const APP_SHELL = [
   './',
   './index.html',
@@ -15,6 +16,7 @@ const APP_SHELL = [
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './assets/world-map.svg',
 ];
 
 self.addEventListener('install', (event) => {
