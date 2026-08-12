@@ -1,0 +1,47 @@
+# Cloudflare Pages reads this file automatically at deploy time — no config
+# needed beyond having it sit at the root of the published folder alongside
+# index.html.
+#
+# This exists specifically to close the gap GitHub Pages couldn't: GitHub
+# Pages doesn't let you set custom HTTP response headers, so the app's CSP
+# had to be delivered via a <meta http-equiv="Content-Security-Policy"> tag
+# in index.html. Per spec, a handful of directives are silently ignored when
+# a CSP arrives that way — most importantly frame-ancestors, which is what
+# actually blocks clickjacking (framing this app inside someone else's page).
+# The <meta> tag stays in index.html as a redundant baseline (it still helps
+# if someone opens the file directly via file://), but the policy below,
+# delivered as a real header, is now the authoritative one and is what
+# actually enforces frame-ancestors.
+#
+# Keep this in sync with the <meta http-equiv="Content-Security-Policy"> tag
+# in index.html if you ever change one — they should describe the same
+# policy, this one just adds frame-ancestors on top.
+
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=(), browsing-topics=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+
+# service-worker.js controls offline caching and is what your README's
+# "更新须知" section relies on to pick up new deploys (via bumping
+# CACHE_VERSION). If Cloudflare's edge or the browser were allowed to cache
+# this specific file, visitors could keep running a stale service worker
+# and never see that version bump. no-cache forces a revalidation on every
+# request so updates are picked up as soon as you deploy them.
+/service-worker.js
+  Cache-Control: no-cache
+
+# Static, rarely-changing assets — safe to let Cloudflare's edge cache them
+# for a while. None of these are referenced by hashed/versioned filenames,
+# so keep this modest rather than "immutable"; if you replace one of these
+# files, also bump CACHE_VERSION as usual so the service worker's own copy
+# updates too.
+/icons/*
+  Cache-Control: public, max-age=86400
+
+/assets/*
+  Cache-Control: public, max-age=86400
