@@ -650,7 +650,7 @@ input[type=file]{font-size:12px;}
 }
 
 .version-badge{
-  position:fixed; right:8px; bottom:6px; z-index:9999;
+  position:fixed; right:8px; bottom:6px; z-index:10000; /* above #lockScreen (9999) so it's visible on the lock screen too */
   font-size:10.5px; color:var(--ink-soft); opacity:0.55;
   font-family:'Inter',sans-serif; letter-spacing:0.02em;
   pointer-events:none; user-select:none;

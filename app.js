@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v7.3';
+const APP_VERSION = 'v7.4';
 const APP_VERSION_DATE = '2026-08-13';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -1525,7 +1525,7 @@ async function renderMapView(){
     if(!p.country) return;
     const match = lookupCountryCoords(p.country);
     if(!match) return;
-    if(!groups[match.name]) groups[match.name] = {lat:match.lat, lng:match.lng, iso:match.iso, people:[]};
+    if(!groups[match.name]) groups[match.name] = {name:match.name, lat:match.lat, lng:match.lng, iso:match.iso, people:[]};
     groups[match.name].people.push(p);
   });
   const countryNames = Object.keys(groups);
@@ -1557,7 +1557,19 @@ async function renderMapView(){
       p.setAttribute('stroke', '#C9B98F');
       p.setAttribute('stroke-width', '0.6');
     });
+    // Small territories that have no shape of their own in this simplified
+    // map AND sit close enough to another country's coastline that the
+    // naive lat/lng→pixel formula below (which assumes a strict equirect-
+    // angular projection this hand-drawn map doesn't actually follow) lands
+    // them in the wrong place — e.g. Hong Kong's formula position landed up
+    // near Bohai Bay, ~60px too far north. These were hand-picked to sit on
+    // the real coastline point in THIS map's own coordinate space.
+    const PIN_PIXEL_OVERRIDES = {
+      '香港': {x:670.2, y:470.4},
+      '澳门': {x:667.0, y:472.0},
+    };
     getPinPos = (g)=>{
+      if(g.name && PIN_PIXEL_OVERRIDES[g.name]) return PIN_PIXEL_OVERRIDES[g.name];
       const fallback = {x: minX+(g.lng+180)/360*W, y: minY+(90-g.lat)/180*H};
       if(g.iso){
         // Prefer the country's actual "mainland" child path (many countries
