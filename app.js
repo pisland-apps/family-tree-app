@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v7.2';
+const APP_VERSION = 'v7.3';
 const APP_VERSION_DATE = '2026-08-13';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');

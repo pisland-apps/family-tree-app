@@ -32,8 +32,22 @@
 # this specific file, visitors could keep running a stale service worker
 # and never see that version bump. no-cache forces a revalidation on every
 # request so updates are picked up as soon as you deploy them.
+#
+# The CSP is explicitly unset here (not just left off) — a bare rule for
+# this path would otherwise inherit the /* CSP anyway (Cloudflare merges
+# headers from every matching rule; it doesn't let a specific rule replace
+# a broader one). That mattered in practice: the CSP a worker script's own
+# response carries governs that worker's own global scope, so a fetch()
+# call made from inside service-worker.js is subject to *that* policy's
+# connect-src, not the page's script-src. When this file's fetch handler
+# still re-fetched cross-origin resources itself, connect-src 'self'
+# silently blocked it and broke JSZip loading (see the comment at the top
+# of service-worker.js). The handler no longer does that, so this isn't
+# load-bearing anymore — it's just insurance against reintroducing the
+# same trap later.
 /service-worker.js
   Cache-Control: no-cache
+  ! Content-Security-Policy
 
 # Static, rarely-changing assets — safe to let Cloudflare's edge cache them
 # for a while. None of these are referenced by hashed/versioned filenames,
