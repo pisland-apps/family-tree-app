@@ -3,8 +3,8 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v7.4';
-const APP_VERSION_DATE = '2026-08-13';
+const APP_VERSION = 'v7.5';
+const APP_VERSION_DATE = '2026-08-14';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
   if(el) el.textContent = `${APP_VERSION} · ${APP_VERSION_DATE}`;
@@ -1512,6 +1512,38 @@ async function loadWorldMapSVG(){
   return null;
 }
 
+// Pushes apart any label anchor points that are closer than `minSep` to each
+// other, using a few iterations of simple pairwise repulsion, and returns a
+// NEW position map (the original pin positions passed in are left untouched
+// — they still anchor the dot itself; only the returned label positions may
+// have moved).
+function declutterLabelPositions(positions, names, W, H){
+  const minSep = Math.min(W, H) * 0.075;
+  const pts = names.map(n=>({name:n, x:positions[n].x, y:positions[n].y}));
+  for(let iter=0; iter<60; iter++){
+    let moved = false;
+    for(let i=0;i<pts.length;i++){
+      for(let j=i+1;j<pts.length;j++){
+        const a = pts[i], b = pts[j];
+        let dx = b.x-a.x, dy = b.y-a.y;
+        let dist = Math.hypot(dx,dy);
+        if(dist < minSep){
+          moved = true;
+          if(dist < 0.001){ dx = 1; dy = -1; dist = Math.hypot(dx,dy); } // identical points: pick a fixed direction
+          const push = (minSep-dist)/2;
+          const ux = dx/dist, uy = dy/dist;
+          a.x -= ux*push; a.y -= uy*push;
+          b.x += ux*push; b.y += uy*push;
+        }
+      }
+    }
+    if(!moved) break;
+  }
+  const result = {};
+  pts.forEach(p=>{ result[p.name] = {x:p.x, y:p.y}; });
+  return result;
+}
+
 async function renderMapView(){
   const wrap = document.getElementById('mapCanvasWrap');
   const outerWrap = document.getElementById('mapCanvasOuter');
@@ -1629,6 +1661,16 @@ async function renderMapView(){
   const positions = {};
   countryNames.forEach(name=>{ positions[name] = getPinPos(groups[name]); });
 
+  // Some countries sit geographically very close to a neighbor (e.g.
+  // Singapore right off the tip of Peninsular Malaysia, or Hong Kong/Macau
+  // next to mainland China) — close enough that their name labels would
+  // print right on top of each other. Rather than hand-picking pixel
+  // offsets for every such pair, nudge apart any label anchors that end up
+  // closer than a minimum separation (a small force-based declutter pass),
+  // then draw a thin leader line from the pin to its label whenever it had
+  // to move, so it's still clear which label belongs to which dot.
+  const labelPositions = declutterLabelPositions(positions, countryNames, W, H);
+
   // populate the hub picker with the countries that actually have data,
   // preserving the current selection if it's still valid
   const hubSelect = document.getElementById('mapHubSelect');
@@ -1670,6 +1712,7 @@ async function renderMapView(){
   countryNames.forEach(name=>{
     const g = groups[name];
     const pos = positions[name];
+    const labelPos = labelPositions[name];
     const group = document.createElementNS(svgNS,'g');
     group.setAttribute('class','map-pin');
     group.setAttribute('data-country', name);
@@ -1689,9 +1732,23 @@ async function renderMapView(){
     circle.setAttribute('stroke-width', '1.6');
     group.appendChild(circle);
 
+    // if the label had to be nudged away from the pin to avoid overlapping
+    // a neighbor's label, draw a thin leader line connecting the two so
+    // it's still obvious which label belongs to which dot
+    const displaced = Math.hypot(labelPos.x-pos.x, labelPos.y-pos.y) > 2;
+    if(displaced){
+      const leader = document.createElementNS(svgNS,'line');
+      leader.setAttribute('x1', pos.x); leader.setAttribute('y1', pos.y);
+      leader.setAttribute('x2', labelPos.x); leader.setAttribute('y2', labelPos.y-4);
+      leader.setAttribute('stroke', '#B9863C');
+      leader.setAttribute('stroke-width', '1');
+      leader.setAttribute('opacity', '0.55');
+      group.appendChild(leader);
+    }
+
     const label = document.createElementNS(svgNS,'text');
-    label.setAttribute('x', pos.x);
-    label.setAttribute('y', pos.y-11);
+    label.setAttribute('x', labelPos.x);
+    label.setAttribute('y', labelPos.y-11);
     label.setAttribute('text-anchor','middle');
     label.setAttribute('font-size', name===hubName ? '13' : '11');
     label.setAttribute('font-weight', name===hubName ? '700' : '600');
@@ -2648,6 +2705,9 @@ function initLockGate(){
     const errorEl = document.getElementById('lockError');
     const passInput = document.getElementById('lockPasscodeInput');
     const confirmInput = document.getElementById('lockConfirmInput');
+    const numpad = document.getElementById('lockNumpad');
+    const keyboardToggleBtn = document.getElementById('lockKeyboardToggle');
+    const hintEl = document.getElementById('lockHint');
 
     const isSetup = !meta;
     title.textContent = isSetup ? '设置访问密码' : '输入密码解锁';
@@ -2657,6 +2717,62 @@ function initLockGate(){
     confirmField.style.display = isSetup ? 'block' : 'none';
     submitBtn.textContent = isSetup ? '设置密码并进入' : '解锁';
     forgotBtn.style.display = isSetup ? 'none' : 'block';
+
+    // ---- Big-numpad passcode entry (default) with a fallback to normal
+    // keyboard typing for anyone whose passcode has letters in it. The
+    // inputs stay `readonly` + `inputmode=none` while in numpad mode so the
+    // mobile virtual keyboard never pops up underneath the numpad; physical
+    // keyboard presses are still handled manually below so desktop typing
+    // keeps working even though the field is readonly. ----
+    let activeLockInput = passInput;
+    let numpadMode = true;
+
+    function setNumpadMode(on){
+      numpadMode = on;
+      [passInput, confirmInput].forEach(inp=>{
+        if(on){ inp.setAttribute('readonly','readonly'); inp.setAttribute('inputmode','none'); }
+        else { inp.removeAttribute('readonly'); inp.setAttribute('inputmode','text'); }
+      });
+      numpad.style.display = on ? 'grid' : 'none';
+      keyboardToggleBtn.textContent = on ? '⌨️' : '🔢';
+      keyboardToggleBtn.title = on ? '切换为键盘输入（可包含字母）' : '切换为数字键盘';
+      hintEl.textContent = on ? '密码包含字母？点击 ⌨️ 切换为键盘输入' : '点击 🔢 切换回数字键盘';
+      activeLockInput.focus();
+    }
+
+    function pushDigit(d){
+      if(activeLockInput.value.length>=64) return;
+      activeLockInput.value += d;
+      errorEl.style.display = 'none';
+    }
+    function popDigit(){
+      activeLockInput.value = activeLockInput.value.slice(0,-1);
+    }
+
+    [passInput, confirmInput].forEach(inp=>{
+      inp.addEventListener('focus', ()=>{ activeLockInput = inp; });
+      // readonly inputs still fire keydown; handle digits/backspace manually
+      // so a physical keyboard works too, and swallow any other key so
+      // stray characters can't sneak into a readonly field.
+      inp.addEventListener('keydown', (e)=>{
+        if(!numpadMode || e.key==='Enter' || e.key==='Tab') return;
+        e.preventDefault();
+        if(e.key>='0' && e.key<='9') pushDigit(e.key);
+        else if(e.key==='Backspace') popDigit();
+      });
+    });
+
+    numpad.querySelectorAll('.numpad-key[data-key]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const key = btn.dataset.key;
+        if(key==='back') popDigit();
+        else pushDigit(key);
+        activeLockInput.focus();
+      });
+    });
+    keyboardToggleBtn.addEventListener('click', ()=> setNumpadMode(!numpadMode));
+    hintEl.addEventListener('click', ()=> setNumpadMode(!numpadMode));
+    setNumpadMode(true);
 
     function showError(msg){
       errorEl.textContent = msg;

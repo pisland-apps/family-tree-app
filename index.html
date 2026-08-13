@@ -508,6 +508,28 @@ svg.connectors{
   font-family:'Inter',sans-serif; font-size:14px; background:var(--bg); color:var(--ink); outline:none; box-sizing:border-box;
 }
 .lock-card input[type=password]:focus{border-color:var(--accent);}
+.lock-card input[type=password][readonly]{caret-color:var(--accent); cursor:default;}
+.lock-numpad{
+  display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin:6px 0 10px;
+}
+.numpad-key{
+  font-family:'Inter',sans-serif; font-size:20px; font-weight:600; color:var(--ink);
+  background:var(--bg-alt); border:1px solid var(--card-border); border-radius:12px;
+  padding:0; height:54px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none; touch-action:manipulation;
+  transition:background .12s ease, transform .12s ease;
+}
+.numpad-key:hover{background:#E4D9BE;}
+.numpad-key:active{background:var(--accent); color:#fff; transform:scale(0.96);}
+.numpad-key-ghost{color:var(--ink-soft); font-size:17px; background:transparent;}
+.numpad-key-ghost:active{background:var(--bg-alt); color:var(--ink);}
+.lock-hint{
+  font-size:11.5px; color:var(--ink-soft); text-align:center; margin:0 0 12px; cursor:pointer;
+}
+@media (min-width:520px){
+  .lock-card{width:400px;}
+  .numpad-key{height:60px; font-size:22px;}
+}
 .lock-error{
   color:var(--danger); font-size:12.5px; margin-bottom:12px; display:none; text-align:left;
 }
@@ -672,11 +694,26 @@ input[type=file]{font-size:12px;}
     <h2 id="lockTitle">设置访问密码</h2>
     <p class="lock-subtitle" id="lockSubtitle">这个密码只保存在你自己的设备本地推导出的密钥里，我们不会上传、也无法帮你找回——请务必牢记。</p>
     <div class="field">
-      <input type="password" id="lockPasscodeInput" placeholder="密码（至少6位）" autocomplete="new-password">
+      <input type="password" id="lockPasscodeInput" placeholder="密码（至少6位）" autocomplete="new-password" readonly inputmode="none">
     </div>
     <div class="field" id="lockConfirmField">
-      <input type="password" id="lockConfirmInput" placeholder="再输入一次确认" autocomplete="new-password">
+      <input type="password" id="lockConfirmInput" placeholder="再输入一次确认" autocomplete="new-password" readonly inputmode="none">
     </div>
+    <div class="lock-numpad" id="lockNumpad">
+      <button type="button" class="numpad-key" data-key="1">1</button>
+      <button type="button" class="numpad-key" data-key="2">2</button>
+      <button type="button" class="numpad-key" data-key="3">3</button>
+      <button type="button" class="numpad-key" data-key="4">4</button>
+      <button type="button" class="numpad-key" data-key="5">5</button>
+      <button type="button" class="numpad-key" data-key="6">6</button>
+      <button type="button" class="numpad-key" data-key="7">7</button>
+      <button type="button" class="numpad-key" data-key="8">8</button>
+      <button type="button" class="numpad-key" data-key="9">9</button>
+      <button type="button" class="numpad-key numpad-key-ghost" id="lockKeyboardToggle" title="切换为键盘输入（可包含字母）">⌨️</button>
+      <button type="button" class="numpad-key" data-key="0">0</button>
+      <button type="button" class="numpad-key numpad-key-ghost" data-key="back" title="删除">⌫</button>
+    </div>
+    <p class="lock-hint" id="lockHint">密码包含字母？点击 ⌨️ 切换为键盘输入</p>
     <div class="lock-error" id="lockError"></div>
     <button class="btn btn-primary" id="lockSubmitBtn">设置密码并进入</button>
     <button class="btn btn-ghost" id="lockForgotBtn" style="display:none;">忘记密码？清除本机数据重新开始</button>
