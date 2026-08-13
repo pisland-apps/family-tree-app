@@ -2,7 +2,7 @@
   "name": "家谱 · 家族树",
   "short_name": "家谱",
   "description": "多家族树家谱管理应用 —— 支持父母/配偶/子女关系、聚焦查看、家族分布地图、离线使用",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

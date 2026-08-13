@@ -8,10 +8,9 @@
 // 注意：IndexedDB（用来存照片）不归 Service Worker 管，浏览器会自己持久化，
 // 不需要在这里做任何处理。
 
-const CACHE_VERSION = 'family-tree-v7.1'; // bump alongside APP_VERSION in app.js on every deploy
+const CACHE_VERSION = 'family-tree-v7.2'; // bump alongside APP_VERSION in app.js on every deploy
 const APP_SHELL = [
   './',
-  './index.html',
   './app.js',
   './manifest.json',
   './icons/icon-192.png',
@@ -41,10 +40,37 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return; // don't try to cache POST/PUT/etc.
 
+  if (req.mode === 'navigate') {
+    // Cloudflare Pages 301/308-redirects /index.html -> / by default, and
+    // Chrome will not let a service worker answer a navigation with a
+    // redirected Response (net::ERR_FAILED). Rather than caching whatever
+    // exact URL the visitor's browser/OS/shortcut happens to navigate to
+    // (which is what broke this before — an installed shortcut launching at
+    // /index.html), every navigation is served from the single canonical
+    // './' cache entry, which Cloudflare serves directly with no redirect.
+    event.respondWith(
+      caches.match('./').then((cached) => {
+        if (cached) return cached;
+        return fetch('./')
+          .then((res) => {
+            if (!res.redirected){
+              const clone = res.clone();
+              caches.open(CACHE_VERSION).then((cache) => cache.put('./', clone));
+            }
+            return res;
+          })
+          .catch(() => caches.match('./'));
+      })
+    );
+    return;
+  }
+
   const isSameOrigin = new URL(req.url).origin === self.location.origin;
 
   if (isSameOrigin) {
-    // App shell: cache-first, fall back to network, then to index.html if all else fails
+    // Non-navigation same-origin requests (app.js, manifest.json, icons,
+    // the world map SVG): cache-first, fall back to network. Navigations
+    // are already handled above and never reach this branch.
     event.respondWith(
       caches.match(req).then((cached) => {
         if (cached) return cached;
@@ -54,7 +80,7 @@ self.addEventListener('fetch', (event) => {
             caches.open(CACHE_VERSION).then((cache) => cache.put(req, clone));
             return res;
           })
-          .catch(() => caches.match('./index.html'));
+          .catch(() => caches.match('./'));
       })
     );
   } else {
