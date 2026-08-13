@@ -1560,10 +1560,13 @@ async function renderMapView(){
     getPinPos = (g)=>{
       const fallback = {x: minX+(g.lng+180)/360*W, y: minY+(90-g.lat)/180*H};
       if(g.iso){
-        const matches = svg.querySelectorAll('#'+g.iso);
-        let el = null;
-        matches.forEach(m=>{ if(m.classList && m.classList.contains('mainland')) el = m; });
-        if(!el && matches.length) el = matches[0];
+        // Prefer the country's actual "mainland" child path (many countries
+        // are grouped as <g id="xx"><path class="mainland">...</path><path>
+        // ...overseas islands/territories...</path></g> — using the whole
+        // group's bbox would get dragged off toward far-flung exclaves like
+        // French Guiana or Réunion, badly skewing the pin position).
+        let el = svg.querySelector('#'+g.iso+' path.mainland');
+        if(!el) el = svg.querySelector('#'+g.iso);
         if(el && el.getBBox){
           try{
             const bb = el.getBBox();
