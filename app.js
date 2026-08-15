@@ -3,8 +3,8 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v7.5';
-const APP_VERSION_DATE = '2026-08-14';
+const APP_VERSION = 'v7.6';
+const APP_VERSION_DATE = '2026-08-15';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
   if(el) el.textContent = `${APP_VERSION} · ${APP_VERSION_DATE}`;
@@ -422,6 +422,47 @@ async function deletePhotoBlob(photoId){
     tx.oncomplete = ()=>resolve();
     tx.onerror = ()=>reject(tx.error);
   });
+}
+// Discards a single photo's blob + cached object URL. Only safe to call once
+// you're sure NOTHING could still reference this photoId — including undo
+// history, which is why nothing calls this directly for a specific id; see
+// gcOrphanedPhotos() below, which is the actual entry point used elsewhere.
+async function purgePhoto(photoId){
+  if(!photoId) return;
+  const url = photoCache[photoId];
+  if(url) URL.revokeObjectURL(url);
+  delete photoCache[photoId];
+  try{ await deletePhotoBlob(photoId); }catch(e){ console.error('清理旧照片失败', photoId, e); }
+}
+// Sweeps IndexedDB for photo blobs that nothing can reach anymore, and
+// removes them. "Reachable" means referenced by any current person's
+// photoId, OR present in any undo-stack snapshot (people who could come
+// back via Ctrl+Z) — so a photo is only ever swept once undo could no
+// longer possibly restore whoever it belonged to. This runs as a best-effort
+// background pass after actions that can orphan a photo (deleting a person,
+// replacing/cancelling a photo pick); it deliberately never deletes
+// synchronously with those actions, precisely so undo keeps working.
+async function gcOrphanedPhotos(){
+  try{
+    const referenced = new Set();
+    people.forEach(p=>{ if(p.photoId) referenced.add(p.photoId); });
+    // The add/edit modal's currently-picked photo (if any) hasn't been saved
+    // onto a person yet, so it won't show up in `people` above — without
+    // this line, picking a second photo in one sitting (see the fPhoto
+    // handler) would cause this same GC pass to delete the pick the user
+    // just made, since only the *previous* pick is meant to be orphaned.
+    if(modalPhotoId) referenced.add(modalPhotoId);
+    undoStack.forEach(snapJson=>{
+      try{
+        const snap = JSON.parse(snapJson);
+        (snap.people||[]).forEach(p=>{ if(p.photoId) referenced.add(p.photoId); });
+      }catch(e){}
+    });
+    const entries = await getAllPhotoEntries();
+    for(const [id] of entries){
+      if(!referenced.has(id)) await purgePhoto(id);
+    }
+  }catch(e){ console.error('清理未引用照片失败', e); }
 }
 async function getAllPhotoEntries(){
   const db = await openPhotoDB();
@@ -1956,6 +1997,11 @@ function deletePerson(id){
   render();
   renderSidePanel();
   toast('已删除 ' + p.name);
+  // The deleted person's photo (if any) may now be orphaned — but the
+  // pushHistory() above means it's still reachable via undo, so don't
+  // delete it outright; let gcOrphanedPhotos() decide (it checks the undo
+  // stack too, and only actually removes what nothing can reach anymore).
+  gcOrphanedPhotos();
 }
 
 /* ============ Modal (add/edit) ============ */
@@ -2046,6 +2092,19 @@ function closeModal(){
   document.getElementById('modalOverlay').classList.remove('show');
   editingId = null;
   modalPreset = {};
+  modalPhotoId = null;
+}
+
+function cancelModal(){
+  // User backed out (✕ / Cancel / clicked the overlay) instead of saving.
+  // If they'd picked a new photo during this session, it was already
+  // uploaded to IndexedDB by the fPhoto handler (for the live preview) but
+  // never got attached to a person's record — gcOrphanedPhotos() will see
+  // it's unreferenced anywhere (current people or undo history) and sweep
+  // it. The original photo, if editing an existing person, was never
+  // touched, so this is a no-op in the normal "opened, looked, closed" case.
+  closeModal();
+  gcOrphanedPhotos();
 }
 
 function saveModal(){
@@ -2098,6 +2157,11 @@ function saveModal(){
     toast('已添加 ' + name);
   }
   closeModal();
+  // If editing replaced an existing photo with a different one, the old
+  // blob may now be orphaned — but pushHistory() above means the old
+  // photoId is still reachable via undo, so let gcOrphanedPhotos() decide;
+  // it won't touch anything still sitting in the undo stack.
+  gcOrphanedPhotos();
 }
 
 /* ============ Search ============ */
@@ -2499,10 +2563,10 @@ function importData(file){
 /* ============ Wire up UI ============ */
 document.getElementById('addRootBtn').addEventListener('click', ()=>openModal(null));
 document.getElementById('emptyAddBtn').addEventListener('click', ()=>openModal(null));
-document.getElementById('modalClose').addEventListener('click', closeModal);
-document.getElementById('cancelBtn').addEventListener('click', closeModal);
+document.getElementById('modalClose').addEventListener('click', cancelModal);
+document.getElementById('cancelBtn').addEventListener('click', cancelModal);
 document.getElementById('saveBtn').addEventListener('click', saveModal);
-document.getElementById('modalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='modalOverlay') closeModal(); });
+document.getElementById('modalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='modalOverlay') cancelModal(); });
 document.getElementById('searchInput').addEventListener('input', handleSearch);
 document.addEventListener('click', (e)=>{
   if(!e.target.closest('.search-wrap')) document.getElementById('searchResults').classList.remove('show');
@@ -2516,8 +2580,13 @@ document.getElementById('fPhoto').addEventListener('change', async (e)=>{
     await putPhotoBlob(photoId, blob);
     const objectUrl = URL.createObjectURL(blob);
     photoCache[photoId] = objectUrl;
+    const previousPick = modalPhotoId;
     modalPhotoId = photoId;
     document.getElementById('photoPreview').innerHTML = `<img src="${objectUrl}">`;
+    // If this replaces a photo picked earlier in the same still-unsaved
+    // session, that earlier upload is now orphaned (it was never attached
+    // to a saved person). gcOrphanedPhotos() will confirm that and sweep it.
+    if(previousPick) gcOrphanedPhotos();
   }catch(err){
     toast('照片处理失败，请换一张试试');
   }
@@ -2850,6 +2919,11 @@ function initLockGate(){
   renderSidePanel();
   centerTree();
   recordNavState();
+  // undoStack is in-memory only and starts empty every reload, so at this
+  // point "reachable" is simply "referenced by someone in people" — this
+  // catches anything left orphaned by a session that ended (crash, tab
+  // close) before a checkpoint elsewhere in the app could sweep it.
+  gcOrphanedPhotos();
 })();
 
 // Register the service worker so the app shell can be cached for offline
