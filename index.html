@@ -805,6 +805,85 @@ body.exporting .card.selected .avatar{box-shadow:none !important;}
   body.search-open .search-wrap{display:flex; position:fixed; top:56px; left:8px; right:8px; z-index:90; max-width:none;}
   .quick-bar button{width:58px; min-height:42px; font-size:13px;}
 }
+
+/* ===== v8.7 design pass: softer avatars, lifespans, CJK serif names, generation band, topbar ===== */
+:root{
+  --font-cjk-serif:'Noto Serif SC','Source Han Serif SC','Noto Serif CJK SC','Songti SC','STSong','SimSun',serif;
+  --g-m:#5E7F8C; --g-f:#C27A5E; --g-o:#B9863C;
+}
+.card .cname, .brand .name{font-family:var(--font-cjk-serif);}
+.card .cname{font-weight:700;}
+.avatar .sn{display:none;}
+.card .cspan{display:none;}
+body.compact-view .card.gender-m{--ring:var(--g-m);}
+body.compact-view .card.gender-f{--ring:var(--g-f);}
+body.compact-view .card.gender-o{--ring:var(--g-o);}
+body.compact-view .card .avatar{
+  border:3px solid var(--ring);
+  background:#EFE6D4;
+  background:color-mix(in srgb, var(--ring) 16%, var(--card-bg));
+  color:var(--ring);
+  color:color-mix(in srgb, var(--ring) 72%, #2A2420);
+}
+body.compact-view .avatar .ini,
+body.compact-view .avatar .sil{display:none;}
+body.compact-view .avatar .sn{
+  display:block; font-family:var(--font-cjk-serif); font-size:26px; font-weight:700; line-height:1;
+}
+body.compact-view .card .cname{border-color:rgba(139,115,85,.28); font-weight:700;}
+body.compact-view .card .cspan{
+  display:block; margin-top:3px; font-size:10.5px; letter-spacing:.2px;
+  color:var(--ink-soft); font-variant-numeric:tabular-nums;
+}
+body.compact-view .card .cspan:empty{display:none;}
+body.compact-view .card.deceased .avatar{
+  filter:saturate(.55);
+  box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px rgba(42,36,32,.55);
+}
+body.compact-view .card.selected.deceased .avatar{
+  box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px rgba(42,36,32,.55), 0 0 0 9px rgba(232,160,60,.38);
+}
+/* generation label: thin translucent vertical band, left of each row */
+.gen-label{
+  left:-62px; top:0; bottom:0; width:24px; height:auto; transform:none;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  background:rgba(139,115,85,.09); border-left:2px solid rgba(185,134,60,.45);
+  border-radius:4px 8px 8px 4px;
+  font-family:var(--font-cjk-serif); font-size:11px; font-weight:600; letter-spacing:0;
+  color:rgba(107,95,81,.85); text-align:center; pointer-events:none; user-select:none;
+}
+.gen-label span{display:block; line-height:1.15;}
+/* narrow portrait phones: just a hairline so it doesn't eat horizontal space */
+@media (max-width:720px) and (orientation:portrait){
+  .gen-label{left:-20px; width:5px; border-left:none; border-radius:3px; background:rgba(185,134,60,.25); font-size:0;}
+  .gen-label span{display:none;}
+}
+/* topbar: low-frequency actions live in ⋯ (help) and ⇅ (import/export) */
+.more-wrap{display:block;}
+.io-wrap{position:relative; display:block;}
+.more-menu .mi-phone,.more-menu .mi-mid,.more-menu .mi-io{display:none;}
+#helpBtn,#exportBtn,#importBtn{display:none !important;}
+@media (min-width:721px){ .io-wrap{order:19;} .more-wrap{order:20;} }
+@media (min-width:721px) and (max-width:1199px){
+  #mapBtn{display:none !important;}
+  .io-wrap{display:none;}
+  .more-menu .mi-mid,.more-menu .mi-io{display:block;}
+  .topbar-actions .btn span.label{display:none;}
+  .topbar-actions #addRootBtn span.label{display:inline;}
+}
+@media (min-width:721px) and (max-width:899px){
+  .brand .name{display:none;}
+  .topbar{padding:0 10px; gap:6px;}
+  .topbar-actions{gap:6px;}
+  .topbar-actions .btn{padding:9px 11px;}
+  .topbar-actions #addRootBtn span.label{display:none;}
+  .tree-switcher{margin-right:0;}
+  .tree-switcher select{max-width:100px;}
+}
+@media (max-width:720px){
+  .io-wrap{display:none;}
+  .more-menu .mi-phone,.more-menu .mi-io{display:block;}
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
   integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
@@ -870,14 +949,15 @@ body.exporting .card.selected .avatar{box-shadow:none !important;}
     <div class="more-wrap">
       <button class="btn-icon-only more-btn" id="moreBtn" title="更多" aria-haspopup="true" aria-expanded="false">⋯</button>
       <div class="more-menu" id="moreMenu" role="menu">
-        <button role="menuitem" data-proxy="navBackBtn">← 返回上一步</button>
-        <button role="menuitem" data-proxy="navForwardBtn">→ 前进下一步</button>
-        <button role="menuitem" data-proxy="compactBtn">◉ 切换紧凑视图</button>
+        <button role="menuitem" class="mi-phone" data-proxy="navBackBtn">← 返回上一步</button>
+        <button role="menuitem" class="mi-phone" data-proxy="navForwardBtn">→ 前进下一步</button>
+        <button role="menuitem" class="mi-phone" data-proxy="compactBtn">◉ 切换紧凑视图</button>
+        <button role="menuitem" class="mi-mid" data-proxy="mapBtn">🗺 地图</button>
         <button role="menuitem" data-proxy="helpBtn">❓ 使用说明</button>
-        <button role="menuitem" data-proxy="lockNowBtn">🔒 立即锁定</button>
-        <button role="menuitem" data-proxy="changePasscodeBtn">🔑 更改密码</button>
-        <button role="menuitem" data-proxy="exportBtn">⬇ 导出</button>
-        <button role="menuitem" data-proxy="importBtn">⬆ 导入</button>
+        <button role="menuitem" class="mi-phone" data-proxy="lockNowBtn">🔒 立即锁定</button>
+        <button role="menuitem" class="mi-phone" data-proxy="changePasscodeBtn">🔑 更改密码</button>
+        <button role="menuitem" class="mi-io" data-proxy="exportBtn">⬇ 导出</button>
+        <button role="menuitem" class="mi-io" data-proxy="importBtn">⬆ 导入</button>
       </div>
     </div>
     <button class="btn btn-ghost" id="compactBtn" title="紧凑视图：圆形头像 + 婚姻连接点" aria-pressed="true">
@@ -911,6 +991,13 @@ body.exporting .card.selected .avatar{box-shadow:none !important;}
     </button>
     <button class="btn btn-ghost" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span class="label">导出</span></button>
     <button class="btn btn-ghost" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V9m0 0 4 4m-4-4-4 4M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/></svg><span class="label">导入</span></button>
+    <div class="io-wrap">
+      <button class="btn-icon-only" id="ioBtn" title="导入 / 导出" aria-haspopup="true" aria-expanded="false">⇅</button>
+      <div class="more-menu" id="ioMenu" role="menu">
+        <button role="menuitem" data-proxy="exportBtn">⬇ 导出</button>
+        <button role="menuitem" data-proxy="importBtn">⬆ 导入</button>
+      </div>
+    </div>
     <input type="file" id="importFile" accept=".json,.zip,.ftenc" style="display:none">
   </div>
 </div>

@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.6';
+const APP_VERSION = 'v8.7';
 const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -340,6 +340,21 @@ function yearsLabel(p){
   }
   return base;
 }
+
+// v8.7: compact-view helpers. surnameChar() = first character of the name
+// (the surname for Chinese names), shown inside the avatar circle when no
+// photo is set. lifespanShort() = '1938–2015' for the line under the name.
+function surnameChar(name){
+  const t = (name||'').trim();
+  if(!t) return '?';
+  return escapeHtml(Array.from(t)[0].toUpperCase());
+}
+function lifespanShort(p){
+  const b = (p.birth||'').toString().trim(), d = (p.death||'').toString().trim();
+  if(!b && !d) return '';
+  return (b||'?') + '–' + d;
+}
+function isDeceased(p){ return !!((p.death||'').toString().trim()); }
 
 /* ============ Image resize ============ */
 function resizeImageToBlob(file, maxDim=220){
@@ -973,7 +988,8 @@ function render(){
     rowEl.dataset.level = li;
     const genLabel = document.createElement('div');
     genLabel.className = 'gen-label';
-    genLabel.textContent = `第 ${li+1} 代`;
+    genLabel.title = `第 ${li+1} 代`;
+    genLabel.innerHTML = `<span>第</span><span>${li+1}</span><span>代</span>`;
     rowEl.appendChild(genLabel);
     canvas.appendChild(rowEl); // append early so we can measure real positions as we go
 
@@ -1096,10 +1112,10 @@ function makeCard(p){
   const card = document.createElement('div');
   const genderClass = p.gender==='F' ? 'gender-f' : (p.gender==='M' ? 'gender-m' : 'gender-o');
   const bridge = isBridgePerson(p.id);
-  card.className = 'card ' + genderClass + (p.id===selectedId ? ' selected':'') + (bridge ? ' bridge-card':'');
+  card.className = 'card ' + genderClass + (p.id===selectedId ? ' selected':'') + (bridge ? ' bridge-card':'') + (isDeceased(p) ? ' deceased':'');
   card.dataset.id = p.id;
   const SIL = '<svg class="sil" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="24" r="11" fill="currentColor"/><path d="M10 60c0-13 9-21 22-21s22 8 22 21z" fill="currentColor"/></svg>';
-  const avatarInner = photoSrc(p) ? `<img src="${escapeHtml(photoSrc(p))}" alt="">` : `<span class="ini">${initials(p.name)}</span>${SIL}`;
+  const avatarInner = photoSrc(p) ? `<img src="${escapeHtml(photoSrc(p))}" alt="">` : `<span class="ini">${initials(p.name)}</span><span class="sn">${surnameChar(p.name)}</span>${SIL}`;
   const kidCount = childrenOf(p.id).length;
   const collapseBtn = kidCount>0 ? `
     <button class="collapse-toggle ${p.collapsed?'is-collapsed':''}" title="${p.collapsed ? '展开下一代' : '收起下一代'}" data-collapse="${escapeHtml(p.id)}">
@@ -1110,8 +1126,9 @@ function makeCard(p){
   card.innerHTML = `
     ${collapseBtn}
     <button class="card-info-btn" title="查看详情 / 编辑">i</button>
-    <div class="avatar">${avatarInner}</div>
+    <div class="avatar"${isDeceased(p) ? ' title="已故"' : ''}>${avatarInner}</div>
     <div class="cname">${escapeHtml(p.name)}</div>
+    <div class="cspan">${escapeHtml(lifespanShort(p))}</div>
     <div class="corder">${escapeHtml(birthOrderLabel(p))}</div>
     <div class="cyears">${[birthOrderLabel(p), yearsLabel(p)].filter(Boolean).join(' · ')}</div>
     ${bridgeBadge}
@@ -3174,26 +3191,32 @@ if('serviceWorker' in navigator && location.protocol!=='file:'){
     }));
   }).observe(document.body, {childList:true, subtree:true});
 
-  // "⋯ more" menu (shown on narrow screens only; items proxy the real buttons)
-  const btn = document.getElementById('moreBtn');
-  const menu = document.getElementById('moreMenu');
-  if(!btn || !menu) return;
-  const close = ()=>{ menu.classList.remove('show'); btn.setAttribute('aria-expanded','false'); };
-  btn.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    const open = !menu.classList.contains('show');
-    menu.classList.toggle('show', open);
-    btn.setAttribute('aria-expanded', String(open));
-  });
-  menu.querySelectorAll('[data-proxy]').forEach(item=>{
-    item.addEventListener('click', ()=>{
-      close();
-      const target = document.getElementById(item.dataset.proxy);
-      if(target) target.click();
+  // "⋯ more" menu and the "⇅ import/export" menu (items proxy the real,
+  // possibly hidden, buttons — .click() works on display:none elements).
+  function setupMenu(btnId, menuId){
+    const btn = document.getElementById(btnId);
+    const menu = document.getElementById(menuId);
+    if(!btn || !menu) return;
+    const close = ()=>{ menu.classList.remove('show'); btn.setAttribute('aria-expanded','false'); };
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const open = !menu.classList.contains('show');
+      document.querySelectorAll('.more-menu.show').forEach(m=>{ if(m!==menu) m.classList.remove('show'); });
+      menu.classList.toggle('show', open);
+      btn.setAttribute('aria-expanded', String(open));
     });
-  });
-  document.addEventListener('click', (e)=>{ if(!menu.contains(e.target) && e.target!==btn) close(); });
-  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') close(); });
+    menu.querySelectorAll('[data-proxy]').forEach(item=>{
+      item.addEventListener('click', ()=>{
+        close();
+        const target = document.getElementById(item.dataset.proxy);
+        if(target) target.click();
+      });
+    });
+    document.addEventListener('click', (e)=>{ if(!menu.contains(e.target) && e.target!==btn) close(); });
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') close(); });
+  }
+  setupMenu('moreBtn','moreMenu');
+  setupMenu('ioBtn','ioMenu');
 })();
 
 
