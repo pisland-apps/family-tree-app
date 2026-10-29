@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.4';
+const APP_VERSION = 'v8.5';
 const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -1189,6 +1189,7 @@ function drawConnectors(){
   }
   const compact = document.body.classList.contains('compact-view');
   const COMPACT_LINE = '#8E8A83';
+  const COMPACT_PALETTE = ['#C4572A','#2E7F8C','#7B5BA8','#5E8F3E','#C08A1E','#3F6DB8','#B8416E','#5F6B73'];
   function addDot(x, y){
     const g = document.createElementNS(svgNS,'g');
     const c1 = document.createElementNS(svgNS,'circle');
@@ -1334,16 +1335,31 @@ function drawConnectors(){
     });
     families.sort((a,b)=>a.avgX-b.avgX);
     const n = families.length;
+    // Compact view: stay neutral grey when the families in this row are clearly
+    // separate (easy to read); switch to one colour per family only when their
+    // horizontal extents overlap, i.e. when grey lines would be hard to tell apart.
+    families.forEach(f=>{
+      const xs = f.jobs.flatMap(j=>[j.startX, j.endX]);
+      f.minX = Math.min(...xs); f.maxX = Math.max(...xs);
+    });
+    let rowNeedsColor = false;
+    for(let i=0; i<n && !rowNeedsColor; i++){
+      for(let j=i+1; j<n; j++){
+        if(families[i].minX < families[j].maxX && families[j].minX < families[i].maxX){ rowNeedsColor = true; break; }
+      }
+    }
     families.forEach((fam, idx)=>{
       const fraction = n<=1 ? 0.5 : 0.28 + (idx/(n-1))*0.5;
       let hash = 0;
       for(let i=0;i<fam.key.length;i++){ hash = (hash*31 + fam.key.charCodeAt(i)) | 0; }
       const lineColor = lineColors[Math.abs(hash) % lineColors.length];
+      // neighbours get consecutive palette colours, so overlapping families never clash
+      const compactColor = rowNeedsColor ? COMPACT_PALETTE[idx % COMPACT_PALETTE.length] : COMPACT_LINE;
       fam.jobs.forEach(job=>{
         const midY = job.startY + (job.endY-job.startY)*fraction;
         const path = document.createElementNS(svgNS,'path');
         path.setAttribute('d', `M ${job.startX} ${job.startY} L ${job.startX} ${midY} L ${job.endX} ${midY} L ${job.endX} ${job.endY}`);
-        path.setAttribute('stroke', compact ? COMPACT_LINE : lineColor);
+        path.setAttribute('stroke', compact ? compactColor : lineColor);
         path.setAttribute('stroke-width', compact ? '3' : '2.5');
         path.setAttribute('stroke-linejoin','round');
         path.setAttribute('fill','none');
