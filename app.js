@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v7.7';
+const APP_VERSION = 'v7.8';
 const APP_VERSION_DATE = '2026-10-02';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -1090,13 +1090,21 @@ function makeCard(p){
   const bridgeBadge = bridge ? `<div class="bridge-badge" data-goto-tree="${escapeHtml(p.id)}" title="属于另一棵家族树，点击前往查看">🔗 ${escapeHtml((trees.find(t=>t.id===(p.treeId||'main'))||{}).name||'其他家族')}</div>` : '';
   card.innerHTML = `
     ${collapseBtn}
+    <button class="card-info-btn" title="查看详情 / 编辑">i</button>
     <div class="avatar">${avatarInner}</div>
     <div class="cname">${escapeHtml(p.name)}</div>
     <div class="cyears">${yearsLabel(p)}</div>
     ${bridgeBadge}
     ${p.notes ? `<div class="card-tooltip">${escapeHtml(p.notes)}</div>` : ''}
   `;
-  card.addEventListener('click', ()=>selectPerson(p.id));
+  card.addEventListener('click', ()=>enterFocus(p.id));
+  const infoBtn = card.querySelector('.card-info-btn');
+  if(infoBtn){
+    infoBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      selectPerson(p.id);
+    });
+  }
   const bridgeEl = card.querySelector('.bridge-badge');
   if(bridgeEl){
     bridgeEl.addEventListener('click', (e)=>{
@@ -1113,7 +1121,7 @@ function makeCard(p){
   }
   const nameEl = card.querySelector('.cname');
   if(nameEl){
-    nameEl.title = '点击姓名聚焦查看此人的家庭';
+    nameEl.title = '点击聚焦查看此人的家庭';
     nameEl.addEventListener('click', (e)=>{
       e.stopPropagation();
       enterFocus(p.id);
@@ -1313,15 +1321,22 @@ function updateHiddenBadge(){
 function enterFocus(id){
   const p = personById(id);
   if(!p) return;
+  const firstEntry = !focusPersonId;
+  if(firstEntry){
+    // first time: show just the immediate circle — parents, spouse, children, siblings
+    focusUpGen = 1;
+    focusDownGen = 1;
+    focusSidewaysLevels = new Set([0]);
+  }
   focusPersonId = id;
+  selectedId = id;          // highlight the card, but keep the detail panel closed
   render();
-  renderSidePanel();
-  centerTree();
-  toast(`已聚焦「${p.name}」的家庭`);
+  document.getElementById('sidePanel').classList.add('hidden');
+  centerOnPerson(id, true);
   recordNavState();
 }
-function centerOnPerson(id){
-  requestAnimationFrame(()=>{
+function centerOnPerson(id, afterRender){
+  const run = ()=>{
     const wrap = document.getElementById('canvasWrap');
     const el = findCardEl(document, id);
     if(!wrap || !el){ centerTree(); return; }
@@ -1336,7 +1351,9 @@ function centerOnPerson(id){
     pan.x += (wrapCenterX - elCenterX);
     pan.y += (wrapCenterY - elCenterY);
     applyTransform();
-  });
+  };
+  if(afterRender) requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(run, 30)));
+  else requestAnimationFrame(run);
 }
 function exitFocus(){
   const previousFocus = focusPersonId;
@@ -1351,7 +1368,7 @@ function adjustFocusGen(which, delta){
   if(which==='up') focusUpGen = Math.max(0, Math.min(15, focusUpGen+delta));
   else focusDownGen = Math.max(0, Math.min(15, focusDownGen+delta));
   render();
-  centerTree();
+  centerOnPerson(focusPersonId, true);
 }
 function renameCurrentTree(){
   const t = trees.find(x=>x.id===currentTreeId);
@@ -1526,7 +1543,7 @@ function updateFocusBar(){
         if(focusSidewaysLevels.has(d)) focusSidewaysLevels.delete(d);
         else focusSidewaysLevels.add(d);
         render();
-        centerTree();
+        centerOnPerson(focusPersonId, true);
       });
     });
   }

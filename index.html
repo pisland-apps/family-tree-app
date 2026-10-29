@@ -677,6 +677,12 @@ input[type=file]{font-size:12px;}
   font-family:'Inter',sans-serif; letter-spacing:0.02em;
   pointer-events:none; user-select:none;
 }
+
+/* v7.7: tiny detail button on cards (click card = focus, click i = details) */
+.card{position:relative;}
+.card .card-info-btn{position:absolute;top:6px;left:6px;width:18px;height:18px;border-radius:50%;border:1px solid var(--border,#d8cbb3);background:rgba(255,255,255,.85);color:#8a6d3b;font:italic 700 11px/16px Georgia,serif;padding:0;cursor:pointer;opacity:0;transition:opacity .15s;z-index:3;}
+.card:hover .card-info-btn,.card.selected .card-info-btn{opacity:1;}
+@media (hover:none){.card .card-info-btn{opacity:.8;}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
   integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
