@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.2';
+const APP_VERSION = 'v8.3';
 const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -288,6 +288,9 @@ let pan = {x:0, y:0};
 let panState = null;
 let lastColumnIndex = {}; // id -> {level, col} snapshot from the most recent render, used to
                           // decide whether two parents sit adjacent to each other on screen
+let compactView = true;   // icon-style view (circle avatars + marriage dots); toggle via topbar button
+try{ const v = localStorage.getItem('ft_compact_view'); if(v==='0') compactView = false; }catch(e){}
+document.body.classList.toggle('compact-view', compactView);
 let panelOpen = false;    // detail panel only shows when explicitly opened (via the 'i' button)
 let focusPersonId = null; // when set, only this person's family (within the gen limits below) shows
 let focusUpGen = 2;       // how many generations of ancestors to include
@@ -1094,7 +1097,8 @@ function makeCard(p){
   const bridge = isBridgePerson(p.id);
   card.className = 'card ' + genderClass + (p.id===selectedId ? ' selected':'') + (bridge ? ' bridge-card':'');
   card.dataset.id = p.id;
-  const avatarInner = photoSrc(p) ? `<img src="${escapeHtml(photoSrc(p))}" alt="">` : initials(p.name);
+  const SIL = '<svg class="sil" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="24" r="11" fill="currentColor"/><path d="M10 60c0-13 9-21 22-21s22 8 22 21z" fill="currentColor"/></svg>';
+  const avatarInner = photoSrc(p) ? `<img src="${escapeHtml(photoSrc(p))}" alt="">` : `<span class="ini">${initials(p.name)}</span>${SIL}`;
   const kidCount = childrenOf(p.id).length;
   const collapseBtn = kidCount>0 ? `
     <button class="collapse-toggle ${p.collapsed?'is-collapsed':''}" title="${p.collapsed ? '展开下一代' : '收起下一代'}" data-collapse="${escapeHtml(p.id)}">
@@ -1107,6 +1111,7 @@ function makeCard(p){
     <button class="card-info-btn" title="查看详情 / 编辑">i</button>
     <div class="avatar">${avatarInner}</div>
     <div class="cname">${escapeHtml(p.name)}</div>
+    <div class="corder">${escapeHtml(birthOrderLabel(p))}</div>
     <div class="cyears">${[birthOrderLabel(p), yearsLabel(p)].filter(Boolean).join(' · ')}</div>
     ${bridgeBadge}
     ${p.notes ? `<div class="card-tooltip">${escapeHtml(p.notes)}</div>` : ''}
@@ -1167,12 +1172,48 @@ function drawConnectors(){
     // scaled by zoom too — dividing by zoom here undoes the one already
     // baked into getBoundingClientRect, so the net scaling applied ends up
     // happening exactly once (matching the cards) instead of twice.
+    const avEl = el.querySelector('.avatar');
+    const ar = avEl ? avEl.getBoundingClientRect() : r;
     return {
       cx: (r.left - canvasRect.left + r.width/2) / zoom,
       top: (r.top - canvasRect.top) / zoom,
       bottom: (r.bottom - canvasRect.top) / zoom,
-      width: r.width / zoom
+      width: r.width / zoom,
+      // avatar geometry — used by the compact (icon-style) view
+      avTop: (ar.top - canvasRect.top) / zoom,
+      avCy: (ar.top - canvasRect.top + ar.height/2) / zoom,
+      avLeft: (ar.left - canvasRect.left) / zoom,
+      avRight: (ar.right - canvasRect.left) / zoom
     };
+  }
+  const compact = document.body.classList.contains('compact-view');
+  const COMPACT_LINE = '#8E8A83';
+  function addDot(x, y){
+    const g = document.createElementNS(svgNS,'g');
+    const c1 = document.createElementNS(svgNS,'circle');
+    c1.setAttribute('cx',x); c1.setAttribute('cy',y); c1.setAttribute('r',11); c1.setAttribute('fill',COMPACT_LINE);
+    const c2 = document.createElementNS(svgNS,'circle');
+    c2.setAttribute('cx',x); c2.setAttribute('cy',y); c2.setAttribute('r',5); c2.setAttribute('fill','none');
+    c2.setAttribute('stroke','#fff'); c2.setAttribute('stroke-width','2');
+    g.appendChild(c1); g.appendChild(c2); svg.appendChild(g);
+  }
+  function marriageLine(a, b){ // straight line between two avatars + dot in the middle
+    const [l, r] = a.cx <= b.cx ? [a, b] : [b, a];
+    const y = l.avCy, x1 = l.avRight, x2 = r.avLeft;
+    const path = document.createElementNS(svgNS,'path');
+    path.setAttribute('d', `M ${x1} ${y} L ${x2} ${y}`);
+    path.setAttribute('stroke', COMPACT_LINE); path.setAttribute('stroke-width','3'); path.setAttribute('fill','none');
+    svg.appendChild(path);
+    addDot((x1+x2)/2, y);
+  }
+  function marriageArc(a, b){ // spouses with someone sitting between them: arc over the top
+    const [l, r] = a.cx <= b.cx ? [a, b] : [b, a];
+    const y = Math.min(l.avTop, r.avTop) - 4;
+    const path = document.createElementNS(svgNS,'path');
+    path.setAttribute('d', `M ${l.cx} ${y} C ${l.cx} ${y-34} ${r.cx} ${y-34} ${r.cx} ${y}`);
+    path.setAttribute('stroke', COMPACT_LINE); path.setAttribute('stroke-width','3'); path.setAttribute('fill','none');
+    svg.appendChild(path);
+    addDot((l.cx+r.cx)/2, y-25);
   }
 
   // marriage lines
@@ -1185,10 +1226,11 @@ function drawConnectors(){
       const elA = findCardEl(canvas, p.id);
       const elB = findCardEl(canvas, sid);
       if(elA && elB && elA.parentElement===elB.parentElement && elA.parentElement.classList.contains('couple-card')){
-        return; // already visually joined into one merged card, no need for a duplicate line
+        return; // already visually joined into one merged card (compact view draws these below)
       }
       const a = cardRect(p.id), b = cardRect(sid);
       if(!a||!b) return;
+      if(compact){ marriageLine(a, b); return; }
       const y = (a.top+a.bottom)/2;
       const path = document.createElementNS(svgNS,'path');
       path.setAttribute('d', `M ${a.cx+a.width/2-4} ${y} L ${b.cx-b.width/2+4} ${y}`);
@@ -1198,6 +1240,22 @@ function drawConnectors(){
       svg.appendChild(path);
     });
   });
+
+  // compact view: marriage line + dot between spouses inside a merged couple group
+  if(compact){
+    canvas.querySelectorAll('.couple-card').forEach(cc=>{
+      const cards = Array.from(cc.querySelectorAll(':scope > .card'));
+      for(let x=0; x<cards.length; x++){
+        for(let y=x+1; y<cards.length; y++){
+          const A = personById(cards[x].dataset.id), B = personById(cards[y].dataset.id);
+          if(!A || !B || !(A.spouses||[]).includes(B.id)) continue;
+          const ra = cardRect(A.id), rb = cardRect(B.id);
+          if(!ra || !rb) continue;
+          if(y===x+1) marriageLine(ra, rb); else marriageArc(ra, rb);
+        }
+      }
+    });
+  }
 
   // parent-child connectors — collect first, draw after, so we can rank
   // lines feeding into the SAME target row by horizontal position and
@@ -1240,7 +1298,7 @@ function drawConnectors(){
     const childRect = cardRect(child.id);
     if(!childRect) return;
     const endX = childRect.cx;
-    const endY = childRect.top;
+    const endY = compact ? childRect.avTop : childRect.top;
     const childLevel = lastColumnIndex[child.id] ? lastColumnIndex[child.id].level : -1;
 
     clusters.forEach(cluster=>{
@@ -1248,7 +1306,10 @@ function drawConnectors(){
       const rects = anchorIds.map(cardRect).filter(Boolean);
       if(rects.length===0) return;
       const startX = rects.reduce((s,r)=>s+r.cx,0)/rects.length;
-      const startY = Math.max(...rects.map(r=>r.bottom));
+      // compact view: a couple's children hang from the marriage dot between them
+      const startY = (compact && rects.length>1)
+        ? rects.reduce((sum,r)=>sum+r.avCy,0)/rects.length
+        : Math.max(...rects.map(r=>r.bottom));
       const familyKey = anchorIds.slice().sort().join('|');
       connectorJobs.push({familyKey, startX, startY, endX, endY, childLevel});
     });
@@ -1281,8 +1342,8 @@ function drawConnectors(){
         const midY = job.startY + (job.endY-job.startY)*fraction;
         const path = document.createElementNS(svgNS,'path');
         path.setAttribute('d', `M ${job.startX} ${job.startY} L ${job.startX} ${midY} L ${job.endX} ${midY} L ${job.endX} ${job.endY}`);
-        path.setAttribute('stroke', lineColor);
-        path.setAttribute('stroke-width','2.5');
+        path.setAttribute('stroke', compact ? COMPACT_LINE : lineColor);
+        path.setAttribute('stroke-width', compact ? '3' : '2.5');
         path.setAttribute('stroke-linejoin','round');
         path.setAttribute('fill','none');
         path.setAttribute('opacity','0.95');
@@ -3041,4 +3102,23 @@ if('serviceWorker' in navigator && location.protocol!=='file:'){
   });
   document.addEventListener('click', (e)=>{ if(!menu.contains(e.target) && e.target!==btn) close(); });
   document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') close(); });
+})();
+
+
+/* ============ v8.3: compact (icon-style) view toggle ============ */
+function setCompactView(on){
+  compactView = !!on;
+  try{ localStorage.setItem('ft_compact_view', compactView ? '1' : '0'); }catch(e){}
+  document.body.classList.toggle('compact-view', compactView);
+  const b = document.getElementById('compactBtn');
+  if(b){ b.classList.toggle('active', compactView); b.setAttribute('aria-pressed', String(compactView)); }
+  render();
+  if(focusPersonId) centerOnPerson(focusPersonId, true); else centerTree();
+}
+(function initCompactBtn(){
+  const b = document.getElementById('compactBtn');
+  if(!b) return;
+  b.classList.toggle('active', compactView);
+  b.setAttribute('aria-pressed', String(compactView));
+  b.addEventListener('click', ()=>setCompactView(!compactView));
 })();

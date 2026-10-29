@@ -727,8 +727,47 @@ input:focus-visible{outline:2px solid var(--accent-2); outline-offset:1px;}
 .more-menu button:hover{background:var(--bg-alt);}
 @media (max-width:720px){
   .more-wrap{display:block;}
-  #helpBtn,#lockNowBtn,#changePasscodeBtn,#exportBtn,#importBtn,#navBackBtn,#navForwardBtn{display:none;}
+  #compactBtn,#helpBtn,#lockNowBtn,#changePasscodeBtn,#exportBtn,#importBtn,#navBackBtn,#navForwardBtn{display:none;}
 }
+
+/* ===== v8.3 compact (icon-style) view ===== */
+.btn.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+.card .corder{display:none;}
+body.compact-view .gen-row{margin-bottom:96px;}
+body.compact-view .card{
+  width:118px; background:transparent; border:none !important; box-shadow:none !important;
+  padding:6px 4px 4px; border-radius:12px;
+  --ring:var(--accent-2);
+}
+body.compact-view .card.gender-m{--ring:#0E7C9B;}
+body.compact-view .card.gender-f{--ring:#E8651E;}
+body.compact-view .card:hover{transform:none; box-shadow:none !important;}
+body.compact-view .card.selected{outline:none;}
+body.compact-view .card .avatar{
+  width:60px; height:60px; margin:0 auto 6px;
+  border:4px solid var(--ring); background:var(--ring); color:#fff;
+}
+body.compact-view .card.selected .avatar{box-shadow:0 0 0 7px rgba(232,160,60,.38);}
+body.compact-view .avatar .ini{display:none;}
+body.compact-view .avatar .sil{display:block; width:100%; height:100%; color:#fff;}
+.avatar .sil{display:none;}
+body.compact-view .card .cname{
+  display:inline-block; max-width:112px; font-size:13px; font-weight:600; line-height:1.25;
+  background:var(--card-bg); border:1px solid var(--card-border); border-radius:7px; padding:1px 7px;
+}
+body.compact-view .card .corder{display:block; font-size:10.5px; color:var(--ink-soft); margin-top:2px; min-height:0;}
+body.compact-view .card .corder:empty{display:none;}
+body.compact-view .card .cyears,
+body.compact-view .card .bridge-badge{display:none;}
+body.compact-view .card.bridge-card .cname{border-style:dashed;}
+body.compact-view .collapse-toggle{top:2px; right:18px; width:20px; height:20px; opacity:.8;}
+body.compact-view .card .card-info-btn{top:2px; left:18px;}
+body.compact-view .couple-card{
+  background:transparent; border:none; box-shadow:none; border-radius:0;
+  gap:36px; display:flex; align-items:flex-start;
+}
+body.compact-view .couple-card:hover{transform:none; box-shadow:none;}
+body.compact-view .couple-card .card + .card{border-left:none;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
   integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
@@ -796,6 +835,7 @@ input:focus-visible{outline:2px solid var(--accent-2); outline-offset:1px;}
       <div class="more-menu" id="moreMenu" role="menu">
         <button role="menuitem" data-proxy="navBackBtn">← 返回上一步</button>
         <button role="menuitem" data-proxy="navForwardBtn">→ 前进下一步</button>
+        <button role="menuitem" data-proxy="compactBtn">◉ 切换紧凑视图</button>
         <button role="menuitem" data-proxy="helpBtn">❓ 使用说明</button>
         <button role="menuitem" data-proxy="lockNowBtn">🔒 立即锁定</button>
         <button role="menuitem" data-proxy="changePasscodeBtn">🔑 更改密码</button>
@@ -803,6 +843,10 @@ input:focus-visible{outline:2px solid var(--accent-2); outline-offset:1px;}
         <button role="menuitem" data-proxy="importBtn">⬆ 导入</button>
       </div>
     </div>
+    <button class="btn btn-ghost" id="compactBtn" title="紧凑视图：圆形头像 + 婚姻连接点" aria-pressed="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="8" r="3"/><circle cx="17" cy="8" r="3"/><path d="M10 8h4"/><path d="M12 8v6M7 20v-3h10v3"/></svg>
+      <span class="label">紧凑</span>
+    </button>
     <button class="btn btn-ghost" id="mapBtn" title="家族分布地图">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20 3 17V4l6 3m0 13 6-3m-6 3V7m6 10 6 3V7l-6-3m0 16V4m0 3-6-3"/></svg>
       <span class="label">地图</span>
