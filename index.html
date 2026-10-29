@@ -673,10 +673,14 @@ input[type=file]{font-size:12px;}
 
 .version-badge{
   position:fixed; right:8px; bottom:6px; z-index:10000; /* above #lockScreen (9999) so it's visible on the lock screen too */
-  font-size:10.5px; color:var(--ink-soft); opacity:0.55;
+  font-size:12.5px; color:var(--ink); opacity:0.9;
   font-family:'Inter',sans-serif; letter-spacing:0.02em;
+  background:rgba(255,252,244,0.92); border:1px solid var(--card-border,#e3d8c0);
+  padding:3px 9px; border-radius:999px;
+  right:max(10px, env(safe-area-inset-right)); bottom:max(10px, env(safe-area-inset-bottom));
   pointer-events:none; user-select:none;
 }
+.lock-version{font-size:12.5px; color:var(--ink-soft); margin:10px 0 0; letter-spacing:0.02em;}
 
 /* v7.7: tiny detail button on cards (click card = focus, click i = details) */
 .card{position:relative;}
@@ -721,6 +725,7 @@ input[type=file]{font-size:12px;}
     </div>
     <p class="lock-hint" id="lockHint">密码包含字母？点击 ⌨️ 切换为键盘输入</p>
     <div class="lock-error" id="lockError"></div>
+    <p class="lock-version" id="lockVersion"></p>
     <button class="btn btn-primary" id="lockSubmitBtn">设置密码并进入</button>
     <button class="btn btn-ghost" id="lockForgotBtn" style="display:none;">忘记密码？清除本机数据重新开始</button>
   </div>

@@ -3,11 +3,13 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v7.8';
-const APP_VERSION_DATE = '2026-10-02';
+const APP_VERSION = 'v7.9';
+const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
   if(el) el.textContent = `${APP_VERSION} · ${APP_VERSION_DATE}`;
+  const lv = document.getElementById('lockVersion');
+  if(lv) lv.textContent = `${APP_VERSION} · ${APP_VERSION_DATE}`;
 })();
 
 /* ============ App lock (PBKDF2 + AES-GCM via Web Crypto) ============ */
@@ -286,6 +288,7 @@ let pan = {x:0, y:0};
 let panState = null;
 let lastColumnIndex = {}; // id -> {level, col} snapshot from the most recent render, used to
                           // decide whether two parents sit adjacent to each other on screen
+let panelOpen = false;    // detail panel only shows when explicitly opened (via the 'i' button)
 let focusPersonId = null; // when set, only this person's family (within the gen limits below) shows
 let focusUpGen = 2;       // how many generations of ancestors to include
 let focusDownGen = 2;     // how many generations of descendants to include
@@ -719,7 +722,7 @@ function toggleCollapse(id){
   p.collapsed = !p.collapsed;
   saveData();
   render();
-  renderSidePanel();
+  renderSidePanel();   // panel visibility is governed by panelOpen, so this never pops it open
 }
 function reorderRow(row, draggedIds, targetIds){
   pushHistory();
@@ -1102,7 +1105,14 @@ function makeCard(p){
   if(infoBtn){
     infoBtn.addEventListener('click', (e)=>{
       e.stopPropagation();
-      selectPerson(p.id);
+      if(panelOpen && selectedId===p.id){
+        panelOpen = false;           // click 'i' again -> close
+        render();
+        renderSidePanel();
+        recordNavState();
+      } else {
+        selectPerson(p.id);
+      }
     });
   }
   const bridgeEl = card.querySelector('.bridge-badge');
@@ -1330,8 +1340,9 @@ function enterFocus(id){
   }
   focusPersonId = id;
   selectedId = id;          // highlight the card, but keep the detail panel closed
+  panelOpen = false;
   render();
-  document.getElementById('sidePanel').classList.add('hidden');
+  renderSidePanel();
   centerOnPerson(id, true);
   recordNavState();
 }
@@ -1906,6 +1917,7 @@ function setAllVisible(visible){
 /* ============ Selection / side panel ============ */
 function selectPerson(id){
   selectedId = id;
+  panelOpen = true;
   render();
   renderSidePanel();
   recordNavState();
@@ -1913,7 +1925,7 @@ function selectPerson(id){
 
 function renderSidePanel(){
   const panel = document.getElementById('sidePanel');
-  if(!selectedId){ panel.classList.add('hidden'); return; }
+  if(!selectedId || !panelOpen){ panel.classList.add('hidden'); return; }
   const p = personById(selectedId);
   if(!p){ panel.classList.add('hidden'); selectedId=null; return; }
   panel.classList.remove('hidden');
@@ -1973,6 +1985,7 @@ function renderSidePanel(){
   });
   panel.querySelector('#panelCloseBtn').addEventListener('click', ()=>{
     selectedId = null;
+    panelOpen = false;
     render();
     renderSidePanel();
     recordNavState();
