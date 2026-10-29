@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.9';
+const APP_VERSION = 'v8.10';
 const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -1444,7 +1444,19 @@ function enterFocus(id){
   render();
   renderSidePanel();
   centerOnPerson(id, true);
+  pulseCard(id);
   recordNavState();
+}
+// v8.10: brief yellow blink on the focused person (3 pulses, then a steady ring)
+function pulseCard(id){
+  setTimeout(()=>{
+    const el = findCardEl(document, id);
+    if(!el) return;
+    el.classList.remove('focus-pulse');
+    void el.offsetWidth;                       // restart the animation
+    el.classList.add('focus-pulse');
+    setTimeout(()=>el.classList.remove('focus-pulse'), 2600);
+  }, 200);
 }
 function centerOnPerson(id, afterRender){
   const run = ()=>{
