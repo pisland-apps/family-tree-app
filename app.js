@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.5';
+const APP_VERSION = 'v8.6';
 const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -1477,10 +1477,72 @@ function renameCurrentTree(){
 }
 
 /* ============ Back / forward browsing history ============ */
+/* ============ v8.6: remember the last-visited place across quit / reopen ============
+   Stores only opaque ids + numbers (tree id, focused person id, zoom, pan) —
+   no names or personal data — so it lives in plain localStorage and can be
+   written synchronously when the page is hidden/closed (the encrypted main
+   store is async and may not finish in time). Nothing is written until init()
+   has finished restoring, so the lock screen can't overwrite the saved spot
+   with defaults. */
+const VIEW_STATE_KEY = 'ft_last_view_v1';
+let viewStateReady = false;
+let viewSaveTimer = null;
+function saveViewState(){
+  if(!viewStateReady) return;
+  try{
+    localStorage.setItem(VIEW_STATE_KEY, JSON.stringify({
+      treeId: currentTreeId,
+      focusPersonId: focusPersonId,
+      selectedId: selectedId,
+      focusUpGen: focusUpGen,
+      focusDownGen: focusDownGen,
+      focusDownSpouses: focusDownSpouses,
+      focusSidewaysLevels: Array.from(focusSidewaysLevels),
+      zoom: zoom,
+      pan: { x: pan.x, y: pan.y }
+    }));
+  }catch(e){}
+}
+function scheduleSaveViewState(){
+  if(!viewStateReady) return;
+  clearTimeout(viewSaveTimer);
+  viewSaveTimer = setTimeout(saveViewState, 400);
+}
+function readViewState(){
+  try{
+    const raw = localStorage.getItem(VIEW_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+// Applies a saved view if it still makes sense; returns true if the pan/zoom
+// was restored (so init() should skip the default centerTree()).
+function applySavedViewState(v){
+  if(!v || typeof v!=='object') return false;
+  if(!trees.some(t=>t.id===v.treeId)) return false;
+  currentTreeId = v.treeId;
+  if(v.focusPersonId && personById(v.focusPersonId)){
+    focusPersonId = v.focusPersonId;
+    if(Number.isFinite(v.focusUpGen)) focusUpGen = v.focusUpGen;
+    if(Number.isFinite(v.focusDownGen)) focusDownGen = v.focusDownGen;
+    focusDownSpouses = v.focusDownSpouses !== false;
+    focusSidewaysLevels = new Set(Array.isArray(v.focusSidewaysLevels) ? v.focusSidewaysLevels : []);
+  }
+  if(v.selectedId && personById(v.selectedId)) selectedId = v.selectedId;
+  const z = Number(v.zoom), px = v.pan && Number(v.pan.x), py = v.pan && Number(v.pan.y);
+  if(Number.isFinite(z) && z>=0.3 && z<=2 && Number.isFinite(px) && Number.isFinite(py)){
+    zoom = z; pan.x = px; pan.y = py;
+    return true;
+  }
+  return false;
+}
+window.addEventListener('pagehide', saveViewState);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveViewState(); });
+
 let navHistory = [];
 let navIndex = -1;
 let navigatingHistory = false; // guard so restoring a state doesn't re-record itself
 function recordNavState(){
+  scheduleSaveViewState();
   if(navigatingHistory) return;
   const state = { selectedId, currentTreeId, focusPersonId, focusUpGen, focusDownGen, focusDownSpouses, focusSidewaysLevels: Array.from(focusSidewaysLevels) };
   const prev = navHistory[navIndex];
@@ -2338,6 +2400,7 @@ function focusOn(id){
 function applyTransform(){
   document.getElementById('canvas').style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
   document.getElementById('zoomReset').textContent = Math.round(zoom*100)+'%';
+  scheduleSaveViewState();
 }
 document.getElementById('zoomIn').addEventListener('click', ()=>{ zoom=Math.min(2, zoom+0.1); applyTransform(); });
 document.getElementById('zoomOut').addEventListener('click', ()=>{ zoom=Math.max(0.3, zoom-0.1); applyTransform(); });
@@ -3071,10 +3134,12 @@ function initLockGate(){
   await loadAllPhotosIntoCache();
   await migrateLegacyPhotos();
   if(justSetUp) saveData(); // force any pre-existing legacy plaintext data to be re-saved encrypted right away
+  const restoredView = applySavedViewState(readViewState());
   renderTreeSelect();
   render();
   renderSidePanel();
-  centerTree();
+  if(restoredView) applyTransform(); else centerTree();
+  viewStateReady = true;
   recordNavState();
   // undoStack is in-memory only and starts empty every reload, so at this
   // point "reachable" is simply "referenced by someone in people" — this
