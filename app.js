@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.8';
+const APP_VERSION = 'v8.9';
 const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2051,12 +2051,20 @@ function showMapPopover(countryName, group, pos, wrap){
   const go = (el)=>{
     const id = el.dataset.gotoMap;
     const person = personById(id);
-    if(person){
-      currentTreeId = person.treeId || 'main';
-      renderTreeSelect();
-      selectPerson(id);
-    }
     document.getElementById('mapOverlay').classList.remove('show');
+    if(person){
+      // v8.9: same as tapping a card — focus + highlight + centre the person
+      // in the generation chart, without opening the detail/edit panel.
+      const tid = person.treeId || 'main';
+      if(tid !== currentTreeId){
+        currentTreeId = tid;
+        renderTreeSelect();
+        const t = trees.find(x=>x.id===tid);
+        if(t) toast(`已切换到「${t.name}」`);
+      }
+      enterFocus(id);
+      if(person.hidden) toast('此人目前被隐藏，可在「显示筛选」中恢复显示');
+    }
   };
   pop.querySelectorAll('[data-goto-map]').forEach(el=>{
     el.addEventListener('click', ()=>go(el));
