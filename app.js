@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.7';
+const APP_VERSION = 'v8.8';
 const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2015,32 +2015,57 @@ async function renderMapView(){
 }
 
 function showMapPopover(countryName, group, pos, wrap){
+  // v8.8: the name list is a docked panel (side of the map away from the pin;
+  // below the map on narrow screens) instead of a tiny popover that could
+  // run off the bottom of the dialog.
   const old = wrap.querySelector('.map-popover');
   if(old) old.remove();
   const pop = document.createElement('div');
-  pop.className = 'map-popover';
-  pop.style.left = `min(${pos.x}%, 78%)`;
-  pop.style.top = `min(${pos.y}%, 75%)`;
+  pop.className = 'map-popover ' + (pos && pos.x > 50 ? 'dock-left' : 'dock-right');
+  const many = group.people.length > 10;
   pop.innerHTML = `
-    <div class="mp-title">${escapeHtml(countryName)} · ${group.people.length}位</div>
+    <div class="mp-head">
+      <div class="mp-title">${escapeHtml(countryName)} · ${group.people.length} 位</div>
+      <button class="mp-x" type="button" title="关闭" aria-label="关闭">✕</button>
+    </div>
+    ${many ? '<div class="mp-search"><input type="text" placeholder="在此名单中查找…" autocomplete="off"></div>' : ''}
+    <div class="mp-list">
     ${group.people.map(p=>{
-      const avatarInner = photoSrc(p) ? `<img src="${escapeHtml(photoSrc(p))}">` : initials(p.name);
-      return `<div class="mp-person" data-goto-map="${escapeHtml(p.id)}"><div class="mp-avatar">${avatarInner}</div>${escapeHtml(p.name)}</div>`;
+      const avatarInner = photoSrc(p) ? `<img src="${escapeHtml(photoSrc(p))}" alt="">` : surnameChar(p.name);
+      return `<div class="mp-person" role="button" tabindex="0" data-goto-map="${escapeHtml(p.id)}" data-name="${escapeHtml((p.name||'').toLowerCase())}"><div class="mp-avatar">${avatarInner}</div><span class="mp-name">${escapeHtml(p.name)}</span><span class="mp-go" aria-hidden="true">›</span></div>`;
     }).join('')}
+    </div>
   `;
   wrap.appendChild(pop);
-  pop.querySelectorAll('[data-goto-map]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      const id = el.dataset.gotoMap;
-      const person = personById(id);
-      if(person){
-        currentTreeId = person.treeId || 'main';
-        renderTreeSelect();
-        selectPerson(id);
-      }
-      document.getElementById('mapOverlay').classList.remove('show');
+  const closePop = ()=> pop.remove();
+  pop.querySelector('.mp-x').addEventListener('click', closePop);
+  const si = pop.querySelector('.mp-search input');
+  if(si){
+    si.addEventListener('input', ()=>{
+      const q = si.value.trim().toLowerCase();
+      pop.querySelectorAll('.mp-person').forEach(el=>{
+        el.style.display = (!q || el.dataset.name.includes(q)) ? '' : 'none';
+      });
     });
+  }
+  const go = (el)=>{
+    const id = el.dataset.gotoMap;
+    const person = personById(id);
+    if(person){
+      currentTreeId = person.treeId || 'main';
+      renderTreeSelect();
+      selectPerson(id);
+    }
+    document.getElementById('mapOverlay').classList.remove('show');
+  };
+  pop.querySelectorAll('[data-goto-map]').forEach(el=>{
+    el.addEventListener('click', ()=>go(el));
+    el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); go(el); } });
   });
+  // narrow screens: panel sits under the map, make sure it's in view
+  if(window.matchMedia('(max-width:700px)').matches){
+    try{ pop.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(e){}
+  }
 }
 
 function renderHiddenPanel(){
@@ -2861,6 +2886,9 @@ document.getElementById('mapCanvasOuter').addEventListener('click', (e)=>{
     const pop = document.querySelector('#mapCanvasOuter .map-popover');
     if(pop) pop.remove();
   }
+});
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape'){ const pop = document.querySelector('#mapCanvasOuter .map-popover'); if(pop) pop.remove(); }
 });
 document.getElementById('helpBtn').addEventListener('click', ()=>{
   document.getElementById('helpOverlay').classList.add('show');
