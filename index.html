@@ -687,6 +687,41 @@ input[type=file]{font-size:12px;}
 .card .card-info-btn{position:absolute;top:6px;left:6px;width:18px;height:18px;border-radius:50%;border:1px solid var(--border,#d8cbb3);background:rgba(255,255,255,.85);color:#8a6d3b;font:italic 700 11px/16px Georgia,serif;padding:0;cursor:pointer;opacity:0;transition:opacity .15s;z-index:3;}
 .card:hover .card-info-btn,.card.selected .card-info-btn{opacity:1;}
 @media (hover:none){.card .card-info-btn{opacity:.8;}}
+
+/* ===== v7.9 polish ===== */
+/* #3 softer grid so connector lines stand out */
+.canvas-wrap{
+  background:
+    linear-gradient(rgba(221,208,178,.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(221,208,178,.35) 1px, transparent 1px);
+  background-size:28px 28px;
+}
+/* #10 slightly larger names */
+.card .cname{font-size:14.5px;}
+/* #11 undefined --border -> real token */
+.card .card-info-btn{border-color:var(--card-border);}
+/* #4 bigger touch target for the collapse button without changing its look */
+.collapse-toggle::after{content:""; position:absolute; inset:-9px;}
+.card .card-info-btn::after{content:""; position:absolute; inset:-9px;}
+/* #13 visible keyboard focus + reduced motion */
+button:focus-visible,select:focus-visible,.card:focus-visible,.search-item:focus-visible{outline:2px solid var(--accent-2); outline-offset:2px;}
+input:focus-visible{outline:2px solid var(--accent-2); outline-offset:1px;}
+@media (prefers-reduced-motion: reduce){*{transition:none !important; animation:none !important;}}
+/* search keyboard highlight */
+.search-item.active{background:var(--bg-alt);}
+.search-add{color:var(--accent); font-weight:600;}
+/* version badge: hide on very short screens so it never covers the numpad */
+@media (max-height:500px){.version-badge{display:none;}}
+/* #1 compact "more" menu: only on narrow screens */
+.more-wrap{position:relative; display:none;}
+.more-menu{display:none; position:absolute; right:0; top:calc(100% + 6px); min-width:150px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:10px; box-shadow:0 8px 24px rgba(60,45,20,.18); padding:6px; z-index:60;}
+.more-menu.show{display:block;}
+.more-menu button{display:block; width:100%; text-align:left; padding:10px 12px; border:none; background:none; border-radius:8px; font-size:14px; color:var(--ink); cursor:pointer;}
+.more-menu button:hover{background:var(--bg-alt);}
+@media (max-width:720px){
+  .more-wrap{display:block;}
+  #helpBtn,#lockNowBtn,#changePasscodeBtn,#exportBtn,#importBtn,#navBackBtn,#navForwardBtn{display:none;}
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
   integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
@@ -749,6 +784,18 @@ input[type=file]{font-size:12px;}
     <div class="search-results" id="searchResults"></div>
   </div>
   <div class="topbar-actions">
+    <div class="more-wrap">
+      <button class="btn-icon-only more-btn" id="moreBtn" title="更多" aria-haspopup="true" aria-expanded="false">⋯</button>
+      <div class="more-menu" id="moreMenu" role="menu">
+        <button role="menuitem" data-proxy="navBackBtn">← 返回上一步</button>
+        <button role="menuitem" data-proxy="navForwardBtn">→ 前进下一步</button>
+        <button role="menuitem" data-proxy="helpBtn">❓ 使用说明</button>
+        <button role="menuitem" data-proxy="lockNowBtn">🔒 立即锁定</button>
+        <button role="menuitem" data-proxy="changePasscodeBtn">🔑 更改密码</button>
+        <button role="menuitem" data-proxy="exportBtn">⬇ 导出</button>
+        <button role="menuitem" data-proxy="importBtn">⬆ 导入</button>
+      </div>
+    </div>
     <button class="btn btn-ghost" id="mapBtn" title="家族分布地图">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20 3 17V4l6 3m0 13 6-3m-6 3V7m6 10 6 3V7l-6-3m0 16V4m0 3-6-3"/></svg>
       <span class="label">地图</span>

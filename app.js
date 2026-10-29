@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v7.9';
+const APP_VERSION = 'v8.0';
 const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -1129,14 +1129,7 @@ function makeCard(p){
       toggleCollapse(p.id);
     });
   }
-  const nameEl = card.querySelector('.cname');
-  if(nameEl){
-    nameEl.title = '点击聚焦查看此人的家庭';
-    nameEl.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      enterFocus(p.id);
-    });
-  }
+  card.title = '点击聚焦查看此人的家庭';
   return card;
 }
 
@@ -1279,9 +1272,10 @@ function drawConnectors(){
         const path = document.createElementNS(svgNS,'path');
         path.setAttribute('d', `M ${job.startX} ${job.startY} L ${job.startX} ${midY} L ${job.endX} ${midY} L ${job.endX} ${job.endY}`);
         path.setAttribute('stroke', lineColor);
-        path.setAttribute('stroke-width','2');
+        path.setAttribute('stroke-width','2.5');
+        path.setAttribute('stroke-linejoin','round');
         path.setAttribute('fill','none');
-        path.setAttribute('opacity','0.8');
+        path.setAttribute('opacity','0.95');
         svg.appendChild(path);
       });
     });
@@ -2200,7 +2194,18 @@ function handleSearch(){
   const box = document.getElementById('searchResults');
   if(!q){ box.classList.remove('show'); box.innerHTML=''; return; }
   const matches = people.filter(p=>p.name.toLowerCase().includes(q)).slice(0,8);
-  if(matches.length===0){ box.innerHTML = '<div class="search-item" style="color:var(--ink-soft)">未找到匹配成员</div>'; box.classList.add('show'); return; }
+  if(matches.length===0){
+    box.innerHTML = `<div class="search-item" style="color:var(--ink-soft)">未找到匹配成员</div><div class="search-item search-add" data-add-name="${escapeHtml(q)}">＋ 没找到？添加「${escapeHtml(document.getElementById('searchInput').value.trim())}」</div>`;
+    box.classList.add('show');
+    box.querySelector('[data-add-name]').addEventListener('click', ()=>{
+      const name = document.getElementById('searchInput').value.trim();
+      box.classList.remove('show');
+      document.getElementById('searchInput').value='';
+      openModal(null);
+      document.getElementById('fName').value = name;
+    });
+    return;
+  }
   box.innerHTML = matches.map(p=>{
     const avatarInner = photoSrc(p) ? `<img style="width:100%;height:100%;object-fit:cover;border-radius:50%;" src="${escapeHtml(photoSrc(p))}">` : '';
     const hiddenTag = p.hidden ? ' <span style="color:var(--danger); font-size:11px;">（已隐藏）</span>' : '';
@@ -2598,6 +2603,24 @@ document.getElementById('cancelBtn').addEventListener('click', cancelModal);
 document.getElementById('saveBtn').addEventListener('click', saveModal);
 document.getElementById('modalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='modalOverlay') cancelModal(); });
 document.getElementById('searchInput').addEventListener('input', handleSearch);
+document.getElementById('searchInput').addEventListener('keydown', (e)=>{
+  const box = document.getElementById('searchResults');
+  const items = Array.from(box.querySelectorAll('.search-item')).filter(el=>el.dataset.id || el.dataset.addName);
+  if(!box.classList.contains('show') || !items.length) return;
+  let idx = items.findIndex(el=>el.classList.contains('active'));
+  if(e.key==='ArrowDown' || e.key==='ArrowUp'){
+    e.preventDefault();
+    idx = e.key==='ArrowDown' ? (idx+1)%items.length : (idx<=0 ? items.length-1 : idx-1);
+    items.forEach(el=>el.classList.remove('active'));
+    items[idx].classList.add('active');
+    items[idx].scrollIntoView({block:'nearest'});
+  } else if(e.key==='Enter'){
+    e.preventDefault();
+    (items[idx>=0?idx:0]).click();
+  } else if(e.key==='Escape'){
+    box.classList.remove('show');
+  }
+});
 document.addEventListener('click', (e)=>{
   if(!e.target.closest('.search-wrap')) document.getElementById('searchResults').classList.remove('show');
 });
@@ -2916,6 +2939,8 @@ function initLockGate(){
     confirmInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') attempt(); });
     forgotBtn.addEventListener('click', async ()=>{
       if(!confirm('这会永久清除本机保存的所有家谱数据和照片（因为没有密码就没法解密），且无法恢复。确定要继续吗？')) return;
+      const typed = prompt('最后确认：请输入「删除」两个字以永久清除本机数据');
+      if((typed||'').trim() !== '删除'){ showError('已取消：未输入「删除」，数据没有被清除'); return; }
       try{
         if(hasClaudeStorage){
           await window.storage.delete(STORE_KEY, false);
@@ -2967,3 +2992,39 @@ if('serviceWorker' in navigator && location.protocol!=='file:'){
     });
   });
 }
+
+
+/* ============ v7.9: accessibility + compact "more" menu ============ */
+(function initA11yAndMoreMenu(){
+  // icon-only buttons: mirror title -> aria-label
+  document.querySelectorAll('button[title]:not([aria-label])').forEach(b=>b.setAttribute('aria-label', b.title));
+  new MutationObserver(muts=>{
+    muts.forEach(m=>m.addedNodes.forEach(n=>{
+      if(n.nodeType!==1) return;
+      const list = n.matches && n.matches('button[title]') ? [n] : [];
+      n.querySelectorAll && n.querySelectorAll('button[title]:not([aria-label])').forEach(b=>list.push(b));
+      list.forEach(b=>{ if(!b.getAttribute('aria-label')) b.setAttribute('aria-label', b.title); });
+    }));
+  }).observe(document.body, {childList:true, subtree:true});
+
+  // "⋯ more" menu (shown on narrow screens only; items proxy the real buttons)
+  const btn = document.getElementById('moreBtn');
+  const menu = document.getElementById('moreMenu');
+  if(!btn || !menu) return;
+  const close = ()=>{ menu.classList.remove('show'); btn.setAttribute('aria-expanded','false'); };
+  btn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const open = !menu.classList.contains('show');
+    menu.classList.toggle('show', open);
+    btn.setAttribute('aria-expanded', String(open));
+  });
+  menu.querySelectorAll('[data-proxy]').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      close();
+      const target = document.getElementById(item.dataset.proxy);
+      if(target) target.click();
+    });
+  });
+  document.addEventListener('click', (e)=>{ if(!menu.contains(e.target) && e.target!==btn) close(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') close(); });
+})();
