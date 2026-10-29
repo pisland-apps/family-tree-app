@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.0';
+const APP_VERSION = 'v8.1';
 const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -318,6 +318,15 @@ function initials(name){
   // innerHTML at several call sites, so it must never depend on callers
   // remembering to wrap it themselves.
   return escapeHtml(raw);
+}
+const ORDER_CN = ['','长','次','三','四','五','六','七','八','九','十'];
+function birthOrderLabel(p){
+  const n = parseInt(p && p.birthOrder, 10);
+  if(!n || n<1) return '';
+  const head = n<=10 ? ORDER_CN[n] : '第'+n;
+  if(p.gender==='M') return head + '子';
+  if(p.gender==='F') return head + '女';
+  return '排行第' + n;
 }
 function yearsLabel(p){
   if(!p.birth && !p.death) return '';
@@ -890,13 +899,15 @@ function orderPeople(level){
       const anchor = idxs.reduce((a,b)=>a+b,0) / idxs.length;
       return {c, anchor};
     });
-    withAnchor.sort((a,b)=>{
-      const ah = a.c.orderHints && a.c.orderHints[currentTreeId];
-      const bh = b.c.orderHints && b.c.orderHints[currentTreeId];
-      const av = ah!==undefined ? ah : a.anchor*10;
-      const bv = bh!==undefined ? bh : b.anchor*10;
-      return av-bv;
-    });
+    // Birth order (排行) wins over manual drag hints: siblings sharing the same
+    // parents line up left-to-right as eldest -> youngest.
+    const sortKey = ({c, anchor})=>{
+      const bo = parseInt(c.birthOrder, 10);
+      if(bo>0) return anchor*10 + bo*0.01;
+      const hint = c.orderHints && c.orderHints[currentTreeId];
+      return hint!==undefined ? hint : anchor*10;
+    };
+    withAnchor.sort((a,b)=>sortKey(a)-sortKey(b));
 
     withAnchor.forEach(({c})=>{
       if(placed.has(c.id)) return;
@@ -1096,7 +1107,7 @@ function makeCard(p){
     <button class="card-info-btn" title="查看详情 / 编辑">i</button>
     <div class="avatar">${avatarInner}</div>
     <div class="cname">${escapeHtml(p.name)}</div>
-    <div class="cyears">${yearsLabel(p)}</div>
+    <div class="cyears">${[birthOrderLabel(p), yearsLabel(p)].filter(Boolean).join(' · ')}</div>
     ${bridgeBadge}
     ${p.notes ? `<div class="card-tooltip">${escapeHtml(p.notes)}</div>` : ''}
   `;
@@ -1129,7 +1140,6 @@ function makeCard(p){
       toggleCollapse(p.id);
     });
   }
-  card.title = '点击聚焦查看此人的家庭';
   return card;
 }
 
@@ -2042,6 +2052,7 @@ function openModal(id, preset){
   document.getElementById('fBirth').value = '';
   document.getElementById('fDeath').value = '';
   document.getElementById('fCountry').value = '';
+  document.getElementById('fOrder').value = '';
   document.getElementById('fNotes').value = '';
   document.getElementById('photoPreview').innerHTML = '👤';
   document.querySelectorAll('input[name=gender]').forEach(r=>r.checked = r.value==='M');
@@ -2055,6 +2066,7 @@ function openModal(id, preset){
     document.getElementById('fBirth').value = p.birth || '';
     document.getElementById('fDeath').value = p.death || '';
     document.getElementById('fCountry').value = p.country || '';
+    document.getElementById('fOrder').value = p.birthOrder ? String(p.birthOrder) : '';
     document.getElementById('fNotes').value = p.notes || '';
     modalPhotoId = p.photoId || null;
     if(photoSrc(p)) document.getElementById('photoPreview').innerHTML = `<img src="${escapeHtml(photoSrc(p))}">`;
@@ -2140,6 +2152,7 @@ function saveModal(){
   const death = document.getElementById('fDeath').value.trim();
   const country = document.getElementById('fCountry').value.trim();
   const notes = document.getElementById('fNotes').value.trim();
+  const birthOrder = parseInt(document.getElementById('fOrder').value, 10) || undefined;
   const parentIds = Array.from(document.querySelectorAll('#parentsSelect input:checked')).map(i=>i.value);
   const spouseIds = Array.from(document.querySelectorAll('#spousesSelect input:checked')).map(i=>i.value);
 
@@ -2147,7 +2160,7 @@ function saveModal(){
     const p = personById(editingId);
     // clean old spouse links then relink
     people.forEach(x=>{ if(x.spouses) x.spouses = x.spouses.filter(id=>id!==editingId); });
-    p.name=name; p.gender=gender; p.birth=birth; p.death=death; p.country=country; p.notes=notes;
+    p.name=name; p.gender=gender; p.birth=birth; p.death=death; p.country=country; p.notes=notes; p.birthOrder=birthOrder;
     p.photoId = modalPhotoId;
     p.parents = parentIds;
     p.spouses = spouseIds;
@@ -2159,7 +2172,7 @@ function saveModal(){
     toast('已更新 ' + name);
   } else {
     const newId = uid();
-    const newPerson = { id:newId, name, gender, birth, death, country, notes, photoId: modalPhotoId, parents: parentIds, spouses: spouseIds, treeId: currentTreeId };
+    const newPerson = { id:newId, name, gender, birth, death, country, notes, birthOrder, photoId: modalPhotoId, parents: parentIds, spouses: spouseIds, treeId: currentTreeId };
     people.push(newPerson);
     spouseIds.forEach(sid=>{
       const sp = personById(sid);
@@ -2424,6 +2437,7 @@ function validateAndNormalizePeople(rawPeople){
       death: importStr(raw.death),
       notes: importStr(raw.notes),
       country: importStr(raw.country) || undefined,
+      birthOrder: (Number.isInteger(raw.birthOrder) && raw.birthOrder>=1 && raw.birthOrder<=30) ? raw.birthOrder : undefined,
       photo: importStr(raw.photo) || null,
       photoId: importStr(raw.photoId) || undefined,
       parents: Array.isArray(raw.parents) ? raw.parents.filter(x=>typeof x==='string').slice(0, IMPORT_LIMITS.maxParentsPerPerson) : [],
