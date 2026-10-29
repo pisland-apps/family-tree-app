@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.3';
+const APP_VERSION = 'v8.4';
 const APP_VERSION_DATE = '2026-10-29';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -576,6 +576,7 @@ function isEffectivelyHidden(id, visited){
   }
   return false;
 }
+let focusDownSpouses = true; // include spouses of descendants (子女+配偶 vs only 子女)
 let focusSidewaysLevels = new Set(); // which ancestor "distances" (0=本人, 1=父母那代, 2=祖父母那代…) have sideways relatives expanded
 
 function collectSiblingsAndDescendants(id, depthDown, set){
@@ -653,7 +654,7 @@ function computeFocusSet(){
   // include spouses of the focus person themself and of every descendant
   // (sons/daughters-in-law belong in a "family view"), but deliberately not
   // of ancestors, so an ancestor's other unrelated marriages stay out of view
-  [focusPersonId, ...descendantIds].forEach(id=>{
+  (focusDownSpouses ? [focusPersonId, ...descendantIds] : [focusPersonId]).forEach(id=>{
     const p = personById(id);
     (p && p.spouses || []).forEach(sid=>{ if(personById(sid)) set.add(sid); });
   });
@@ -1401,6 +1402,7 @@ function enterFocus(id){
     // first time: show just the immediate circle — parents, spouse, children, siblings
     focusUpGen = 1;
     focusDownGen = 1;
+    focusDownSpouses = true;
     focusSidewaysLevels = new Set([0]);
   }
   focusPersonId = id;
@@ -1464,7 +1466,7 @@ let navIndex = -1;
 let navigatingHistory = false; // guard so restoring a state doesn't re-record itself
 function recordNavState(){
   if(navigatingHistory) return;
-  const state = { selectedId, currentTreeId, focusPersonId, focusUpGen, focusDownGen, focusSidewaysLevels: Array.from(focusSidewaysLevels) };
+  const state = { selectedId, currentTreeId, focusPersonId, focusUpGen, focusDownGen, focusDownSpouses, focusSidewaysLevels: Array.from(focusSidewaysLevels) };
   const prev = navHistory[navIndex];
   if(prev && JSON.stringify(prev)===JSON.stringify(state)) return; // no real change, skip
   navHistory = navHistory.slice(0, navIndex+1);
@@ -1480,6 +1482,7 @@ function restoreNavState(state){
   focusPersonId = state.focusPersonId;
   focusUpGen = state.focusUpGen;
   focusDownGen = state.focusDownGen;
+  focusDownSpouses = state.focusDownSpouses !== false;
   focusSidewaysLevels = new Set(state.focusSidewaysLevels || []);
   renderTreeSelect();
   render();
@@ -1603,6 +1606,14 @@ function updateFocusBar(){
   document.getElementById('focusName').textContent = personById(focusPersonId).name;
   document.getElementById('focusUpVal').textContent = focusUpGen;
   document.getElementById('focusDownVal').textContent = focusDownGen;
+  document.querySelectorAll('#quickUp [data-up]').forEach(b=>{
+    const v = parseInt(b.dataset.up,10);
+    b.classList.toggle('active', v>=15 ? focusUpGen>=15 : focusUpGen===v);
+  });
+  document.querySelectorAll('#quickDown [data-down]').forEach(b=>{
+    const v = parseInt(b.dataset.down,10), sp = b.dataset.sp==='1';
+    b.classList.toggle('active', (v>=15 ? focusDownGen>=15 : focusDownGen===v) && focusDownSpouses===sp);
+  });
 
   const genNames = ['本人','父母','祖父母','曾祖父母','高祖父母'];
   const wrap = document.getElementById('focusSidewaysToggles');
@@ -2318,7 +2329,7 @@ document.getElementById('zoomReset').addEventListener('click', ()=>{ zoom=1; app
 
 const wrap = document.getElementById('canvasWrap');
 wrap.addEventListener('mousedown', (e)=>{
-  if(e.target.closest('.card')) return;
+  if(e.target.closest('.card, .quick-bar, .fab-col, .zoom-controls')) return;
   panState = {startX:e.clientX, startY:e.clientY, origX:pan.x, origY:pan.y};
   wrap.style.cursor='grabbing';
 });
@@ -2338,7 +2349,7 @@ wrap.addEventListener('wheel', (e)=>{
 // basic touch pan/pinch
 let touchState=null;
 wrap.addEventListener('touchstart', (e)=>{
-  if(e.target.closest('.card')) return;
+  if(e.target.closest('.card, .quick-bar, .fab-col, .zoom-controls')) return;
   if(e.touches.length===1){
     touchState={mode:'pan', startX:e.touches[0].clientX, startY:e.touches[0].clientY, origX:pan.x, origY:pan.y};
   } else if(e.touches.length===2){
@@ -3122,3 +3133,92 @@ function setCompactView(on){
   b.setAttribute('aria-pressed', String(compactView));
   b.addEventListener('click', ()=>setCompactView(!compactView));
 })();
+
+
+/* ============ v8.4: quick bars + floating controls ============ */
+document.querySelectorAll('#quickUp [data-up]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    if(!focusPersonId) return;
+    focusUpGen = parseInt(b.dataset.up, 10);
+    render();
+    centerOnPerson(focusPersonId, true);
+    recordNavState();
+  });
+});
+document.querySelectorAll('#quickDown [data-down]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    if(!focusPersonId) return;
+    focusDownGen = parseInt(b.dataset.down, 10);
+    focusDownSpouses = b.dataset.sp === '1';
+    render();
+    centerOnPerson(focusPersonId, true);
+    recordNavState();
+  });
+});
+
+// locate: bring the focused / selected person (or the whole tree) back to the centre
+document.getElementById('fabLocate').addEventListener('click', ()=>{
+  const id = focusPersonId || selectedId;
+  if(id && personById(id)) centerOnPerson(id); else centerTree();
+});
+
+// search button (narrow screens: the top-bar search box is tucked away until needed)
+(function initFabSearch(){
+  const btn = document.getElementById('fabSearch');
+  const input = document.getElementById('searchInput');
+  if(!btn || !input) return;
+  btn.addEventListener('click', ()=>{
+    document.body.classList.add('search-open');
+    input.focus();
+  });
+  input.addEventListener('blur', ()=>{
+    setTimeout(()=>document.body.classList.remove('search-open'), 250);
+  });
+})();
+
+// export the whole tree as a PNG (html2canvas is bundled locally, loaded on first use)
+let html2canvasLoading = null;
+function loadHtml2Canvas(){
+  if(window.html2canvas) return Promise.resolve();
+  if(html2canvasLoading) return html2canvasLoading;
+  html2canvasLoading = new Promise((resolve, reject)=>{
+    const sc = document.createElement('script');
+    sc.src = './html2canvas.min.js';
+    sc.onload = resolve;
+    sc.onerror = ()=>{ html2canvasLoading = null; reject(new Error('load failed')); };
+    document.head.appendChild(sc);
+  });
+  return html2canvasLoading;
+}
+document.getElementById('fabShot').addEventListener('click', async ()=>{
+  const canvasEl = document.getElementById('canvas');
+  if(!canvasEl || !canvasEl.querySelector('.card')){ toast('画布上还没有成员可导出'); return; }
+  toast('正在生成图片…');
+  const prevTransform = canvasEl.style.transform;
+  try{
+    await loadHtml2Canvas();
+    document.body.classList.add('exporting');
+    canvasEl.style.transform = 'none';
+    await new Promise(r=>setTimeout(r, 60));
+    const out = await window.html2canvas(canvasEl, {
+      backgroundColor: '#F6F1E4',
+      scale: Math.min(2, window.devicePixelRatio || 1),
+      useCORS: true, logging: false
+    });
+    const blob = await new Promise(res=>out.toBlob(res, 'image/png'));
+    if(!blob) throw new Error('empty');
+    const t = trees.find(x=>x.id===currentTreeId);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(t && t.name) || '家谱'}-${new Date().toISOString().slice(0,10)}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    toast('图片已保存');
+  }catch(err){
+    console.error(err);
+    toast('生成图片失败，请重试');
+  }finally{
+    canvasEl.style.transform = prevTransform;
+    document.body.classList.remove('exporting');
+  }
+});

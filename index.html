@@ -768,6 +768,43 @@ body.compact-view .couple-card{
 }
 body.compact-view .couple-card:hover{transform:none; box-shadow:none;}
 body.compact-view .couple-card .card + .card{border-left:none;}
+
+/* ===== v8.4 quick bars + floating controls ===== */
+.quick-bar{display:none; position:absolute; left:12px; z-index:16; flex-direction:column; gap:0;
+  background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; box-shadow:var(--shadow); overflow:hidden;}
+body.has-focus-bar .quick-bar{display:flex;}
+.quick-bar-up{top:12px;}
+.quick-bar-down{bottom:18px;}
+.quick-bar button{
+  width:66px; min-height:46px; padding:6px 4px; border:none; border-bottom:1px solid var(--card-border);
+  background:transparent; color:var(--accent-2,#B9863C); font-size:14px; font-weight:700; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.15;
+}
+.quick-bar button:last-child{border-bottom:none;}
+.quick-bar button small{font-size:10px; font-weight:600; opacity:.85;}
+.quick-bar button:hover{background:var(--bg-alt);}
+.quick-bar button.active{background:var(--accent-2,#B9863C); color:#fff;}
+/* the old +/- steppers are replaced by the quick bars */
+.focus-stepper{display:none;}
+.fab-col{position:absolute; z-index:15; display:flex; flex-direction:column; gap:8px;}
+.fab-top{top:12px; right:18px;}
+.fab{
+  width:42px; height:42px; border-radius:10px; border:1px solid var(--card-border);
+  background:var(--card-bg); color:var(--ink); box-shadow:var(--shadow); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; padding:0;
+}
+.fab svg{width:20px; height:20px;}
+.fab:hover{background:var(--bg-alt);}
+.fab-search-only{display:none;}
+.zoom-controls #fabLocate{border-top:1px solid var(--card-border); border-radius:0 0 6px 6px; margin-top:2px;}
+body.exporting .collapse-toggle, body.exporting .card-info-btn{display:none !important;}
+body.exporting .card.selected .avatar{box-shadow:none !important;}
+@media (max-width:720px){
+  .fab-search-only{display:flex;}
+  .search-wrap{display:none;}
+  body.search-open .search-wrap{display:flex; position:fixed; top:56px; left:8px; right:8px; z-index:90; max-width:none;}
+  .quick-bar button{width:58px; min-height:42px; font-size:13px;}
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
   integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
@@ -911,10 +948,33 @@ body.compact-view .couple-card .card + .card{border-left:none;}
         添加第一位成员
       </button>
     </div>
+    <div class="quick-bar quick-bar-up" id="quickUp" aria-label="上溯几代">
+      <button data-up="15" title="显示所有祖先">全部<small>祖先</small></button>
+      <button data-up="3" title="上溯 3 代">3 代<small>往上</small></button>
+      <button data-up="2" title="上溯 2 代">2 代<small>往上</small></button>
+      <button data-up="1" title="只看父母">父母<small>往上</small></button>
+    </div>
+    <div class="quick-bar quick-bar-down" id="quickDown" aria-label="下延几代">
+      <button data-down="1" data-sp="0" title="只看子女">子女</button>
+      <button data-down="1" data-sp="1" title="子女和他们的配偶">子女<small>＋配偶</small></button>
+      <button data-down="2" data-sp="1" title="到孙辈">孙辈</button>
+      <button data-down="15" data-sp="1" title="显示所有后代">全部<small>后代</small></button>
+    </div>
+    <div class="fab-col fab-top">
+      <button id="fabSearch" class="fab fab-search-only" title="搜索家庭成员" aria-label="搜索家庭成员">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </button>
+      <button id="fabShot" class="fab" title="导出整棵树为图片" aria-label="导出整棵树为图片">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/></svg>
+      </button>
+    </div>
     <div class="zoom-controls">
-      <button id="zoomIn">+</button>
-      <button id="zoomReset" style="font-size:11px;">100%</button>
-      <button id="zoomOut">−</button>
+      <button id="zoomIn" aria-label="放大">+</button>
+      <button id="zoomReset" style="font-size:11px;" aria-label="恢复 100%">100%</button>
+      <button id="zoomOut" aria-label="缩小">−</button>
+      <button id="fabLocate" title="回到中心人物" aria-label="回到中心人物">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+      </button>
     </div>
   </div>
 
