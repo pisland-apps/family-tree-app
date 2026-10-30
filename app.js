@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.24';
+const APP_VERSION = 'v8.25';
 const APP_VERSION_DATE = '2026-10-30';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -591,6 +591,8 @@ function isEffectivelyHidden(id, visited){
   }
   return false;
 }
+let focusExtra = new Set();      // 聚焦时手动点"+"展开的人：其全部后代并入聚焦范围
+let focusExtraFor = null;
 let focusDownSpouses = true; // include spouses of descendants (子女+配偶 vs only 子女)
 let focusSidewaysLevels = new Set(); // which ancestor "distances" (0=本人, 1=父母那代, 2=祖父母那代…) have sideways relatives expanded
 
@@ -694,6 +696,20 @@ function computeFocusSet(){
     }
   });
 
+  if(focusExtraFor!==focusPersonId){ focusExtra = new Set(); focusExtraFor = focusPersonId; }
+  focusExtra.forEach(xid=>{
+    if(!set.has(xid)) return;
+    const seen = new Set(), stack = [xid];
+    while(stack.length){
+      const cur = stack.pop();
+      childrenOf(cur).forEach(c=>{
+        if(seen.has(c.id)) return; seen.add(c.id);
+        set.add(c.id);
+        (c.spouses||[]).forEach(sid=>{ if(personById(sid)) set.add(sid); });
+        stack.push(c.id);
+      });
+    }
+  });
   return set;
 }
 let currentTreeMembers = null; // Set of ids belonging to (or bridging into) currentTreeId, recomputed each render()
@@ -744,10 +760,19 @@ function visiblePeople(){
   return people.filter(p=>isVisible(p.id));
 }
 function toggleCollapse(id){
-  pushHistory();
   const p = personById(id);
   if(!p) return;
+  if(focusPersonId){
+    if(focusExtraFor!==focusPersonId){ focusExtra = new Set(); focusExtraFor = focusPersonId; }
+    const fs = computeFocusSet();
+    // 孩子被聚焦范围挡住（不是被收起）：点"−"其实想看到他们，把后代并入聚焦范围即可
+    if(fs && fs.has(id) && !p.collapsed && childrenOf(id).some(c=>!fs.has(c.id))){
+      focusExtra.add(id); render(); renderSidePanel(); return;
+    }
+  }
+  pushHistory();
   p.collapsed = !p.collapsed;
+  if(focusPersonId){ if(p.collapsed) focusExtra.delete(id); else { if(focusExtraFor!==focusPersonId){ focusExtra = new Set(); focusExtraFor = focusPersonId; } focusExtra.add(id); } }
   // 子女只要有一方父母处于收起状态就会被隐藏，所以有共同子女的夫妻一起展开/收起，
   // 否则（尤其多位配偶时）只点一个"+"看起来像没反应
   (p.spouses||[]).forEach(sid=>{
@@ -2639,16 +2664,15 @@ function stickGenLabels(){
   const canvas = document.getElementById('canvas'), wrapEl = document.getElementById('canvasWrap');
   if(!canvas || !wrapEl) return;
   const cr = canvas.getBoundingClientRect(), wr = wrapEl.getBoundingClientRect();
-  let margin = 8;
-  ['quickUp','quickDown'].forEach(id=>{
-    const q = document.getElementById(id);
-    if(q && q.offsetParent!==null) margin = Math.max(margin, q.getBoundingClientRect().right - wr.left + 6);
-  });
-  const visLeft = (wr.left - cr.left) / zoom + margin / zoom;
+  const bars = ['quickUp','quickDown'].map(id=>document.getElementById(id)).filter(q=>q && q.offsetParent!==null).map(q=>q.getBoundingClientRect());
   canvas.querySelectorAll('.gen-label').forEach(l=>{
     const cur = parseFloat(l.dataset.shift || '0');
-    const base = (l.getBoundingClientRect().left - cr.left) / zoom - cur;
-    const shift = Math.max(0, visLeft - base);
+    const r = l.getBoundingClientRect();
+    // 只有与左侧快捷按钮在纵向上重叠的那几排，才需要让开按钮
+    let margin = 8;
+    bars.forEach(b=>{ if(r.top < b.bottom && r.bottom > b.top) margin = Math.max(margin, b.right - wr.left + 6); });
+    const base = (r.left - cr.left) / zoom - cur;
+    const shift = Math.max(0, ((wr.left - cr.left) + margin) / zoom - base);
     if(Math.abs(shift-cur) > 0.5){ l.style.transform = `translateX(${shift}px)`; l.dataset.shift = shift; }
   });
 }
