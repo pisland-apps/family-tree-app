@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.22';
+const APP_VERSION = 'v8.23';
 const APP_VERSION_DATE = '2026-10-30';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -924,15 +924,16 @@ function orderPeople(level){
       const anchor = idxs.reduce((a,b)=>a+b,0) / idxs.length;
       return {c, anchor};
     });
-    // Birth order (排行) wins over manual drag hints: siblings sharing the same
-    // parents line up left-to-right as eldest -> youngest.
-    const sortKey = ({c, anchor})=>{
+    // v8.23: 孩子永远先按父母所在的列排；同一对父母的孩子之间，再用 排行 > 手动拖动顺序。
+    // 之前手动拖动记下的是"当时那一排的绝对位置"，直接拿去和别人的父母位置比较，
+    // 换一个显示范围（聚焦/全部）后尺度对不上，孩子就被甩到离父母很远的地方。
+    const second = ({c})=>{
       const bo = parseInt(c.birthOrder, 10);
-      if(bo>0) return anchor*10 + bo*0.01;
+      if(bo>0) return bo;
       const hint = c.orderHints && c.orderHints[currentTreeId];
-      return hint!==undefined ? hint : anchor*10;
+      return 1000 + (hint!==undefined ? hint : 0);
     };
-    withAnchor.sort((a,b)=>sortKey(a)-sortKey(b));
+    withAnchor.sort((x,y)=> (x.anchor-y.anchor) || (second(x)-second(y)));
 
     withAnchor.forEach(({c})=>{
       if(placed.has(c.id)) return;
