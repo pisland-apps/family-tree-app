@@ -67,13 +67,19 @@ function pathTo(best, id){
 
 /* ---------- 长幼：同父母兄弟优先比排行，其次比出生年份；比不出来就报"缺数据" ---------- */
 function cmpAge(a,b){
-  const share = (a.parents||[]).some(x=>(b.parents||[]).includes(x));
-  if(share && a.birthOrder && b.birthOrder && a.birthOrder!==b.birthOrder) return a.birthOrder<b.birthOrder?1:-1;
+  const pa=a.parents||[], pb=b.parents||[];
+  const full = pa.length>0 && pa.length===pb.length && pa.every(x=>pb.includes(x)); // 父母完全相同才信排行
   const x=parseInt(a.birth,10), y=parseInt(b.birth,10);
-  if(!isNaN(x)&&!isNaN(y)&&x!==y) return x<y?1:-1;
-  return 0;
+  const byYear = (!isNaN(x)&&!isNaN(y)&&x!==y) ? (x<y?1:-1) : 0;
+  const byOrder = (full && a.birthOrder && b.birthOrder && a.birthOrder!==b.birthOrder) ? (a.birthOrder<b.birthOrder?1:-1) : 0;
+  if(byYear && byOrder && byYear!==byOrder) return NaN;   // 年份与排行矛盾：不猜
+  return byYear || byOrder;
 }
-const older = (a,b)=>{ const c=cmpAge(a,b); return c||need('排行或出生年份'); };
+const older = (a,b)=>{
+  const c=cmpAge(a,b);
+  if(Number.isNaN(c)){ const e=new Error('conflict'); e.hint='「'+a.name+'」与「'+b.name+'」的排行和出生年份互相矛盾，请检查'; throw e; }
+  return c||need('排行或出生年份');
+};
 const sx = (p,m,f)=> p.gender==='M'?m : p.gender==='F'?f : need('性别');
 
 /* ---------- 纯血缘段 → {t:称谓, k:类型, o:长幼}；不在表内返回 null ---------- */
@@ -171,7 +177,7 @@ function compute(people, meId){
       if(t){ info.title = t + (best.get(id).nb ? '（继/养）' : ''); }
       else info.hint = '关系较远，暂无标准称谓';
     }catch(e){
-      if(e.need) info.hint = '补充'+e.need+'后可显示称谓'; else throw e;
+      if(e.need) info.hint = '补充'+e.need+'后可显示称谓'; else if(e.hint) info.hint = e.hint; else throw e;
     }
     result.set(id, info);
   });
