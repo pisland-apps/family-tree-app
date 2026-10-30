@@ -940,6 +940,17 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
 .card .card-me-btn.on{background:#b4532a;color:#fff;border-color:#b4532a;}
 @media (hover:none){.card .card-me-btn{opacity:.8;}}
 .kin-age{margin-top:6px; padding-top:6px; border-top:1px dashed #d9cdbd; font-size:12px;} .kin-age .btn{padding:2px 8px; font-size:12px; margin-top:4px;}
+.kin-chart{position:fixed; inset:0; z-index:90; background:rgba(40,30,20,.45); display:none; align-items:center; justify-content:center;}
+.kc-box{background:#fbf7f0; max-width:96vw; max-height:92vh; display:flex; flex-direction:column; border-radius:12px; padding:12px 14px; box-shadow:0 8px 30px rgba(0,0,0,.3);}
+.kc-head{display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; font-size:14px;}
+.kc-scroll{overflow:auto;} .kc{border-collapse:separate; border-spacing:6px 4px;}
+.kc th{font-size:12px; color:#8a6d3b; font-weight:600; text-align:center; white-space:nowrap; padding:2px 6px;}
+.kc tbody th{text-align:right; vertical-align:top; padding-top:8px; position:sticky; left:0; background:#fbf7f0;}
+.kc td{vertical-align:top; min-width:84px; background:rgba(255,255,255,.4); border-radius:8px; padding:4px;}
+.kc-item{margin:3px 0; padding:3px 8px; border:1px solid #e3d8c6; border-radius:8px; background:#fff; cursor:pointer; font-size:12px; text-align:center;}
+.kc-item b{display:block; color:#b4532a; font-size:13px;} .kc-item span{color:#6b5b4b;}
+.kc-item.me{background:#b4532a; border-color:#b4532a;} .kc-item.me b,.kc-item.me span{color:#fff;}
+.kc-foot{margin-top:6px; font-size:12px; color:#8a7a68;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
   integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="

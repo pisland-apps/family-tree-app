@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.20';
+const APP_VERSION = 'v8.21';
 const APP_VERSION_DATE = '2026-10-30';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -986,6 +986,41 @@ function setElder(aId, bId){   // a 比 b 大：记在 a.elder 上（属于家�
   a.elder = Array.from(new Set([...(a.elder||[]), bId]));
   saveData(); render(); renderSidePanel();
 }
+/* ===== 亲戚图表：横向按辈分（左长辈→右晚辈），纵向分 父系 / 本人这一辈 / 母系 / 配偶一方 ===== */
+function openKinChart(){
+  if(!viewerId || !kinMap) return;
+  let ov = document.getElementById('kinChart');
+  if(!ov){
+    ov = document.createElement('div'); ov.id = 'kinChart'; ov.className = 'kin-chart';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e=>{ if(e.target===ov) ov.style.display='none'; });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') ov.style.display='none'; });
+  }
+  const GEN = {'-4':'高祖辈','-3':'曾祖辈','-2':'祖辈','-1':'父辈','0':'平辈','1':'子辈','2':'孙辈','3':'曾孙辈'};
+  const SECTIONS = [['p','父系'],['self','本人这一辈与晚辈'],['m','母系'],['s','配偶一方']];
+  const cells = {}; const gens = new Set(); let skipped = 0;
+  kinMap.forEach((k,id)=>{
+    const p = personById(id); if(!p) return;
+    if(!k.title){ skipped++; return; }
+    const g = k.place.gen; gens.add(g);
+    ((cells[k.place.side] = cells[k.place.side]||{})[g] = (cells[k.place.side]||{})[g]||[]).push({id,p,k});
+  });
+  const cols = Array.from(gens).sort((x,y)=>x-y);
+  const yr = it=>{ const y = parseInt(it.p.birth,10); return isNaN(y) ? 9999 : y; };
+  const cell = list=> (list||[]).sort((x,y)=>yr(x)-yr(y) || x.p.name.localeCompare(y.p.name)).map(it=>
+    `<div class="kc-item${it.id===viewerId?' me':''}" data-id="${escapeHtml(it.id)}" title="${escapeHtml(it.k.chain)}"><b>${escapeHtml(it.k.title)}</b><span>${escapeHtml(it.p.name)}</span></div>`).join('');
+  const body = SECTIONS.filter(([s])=>cells[s]).map(([s,label])=>
+    `<tr class="kc-${s}"><th>${label}</th>${cols.map(g=>`<td>${cell((cells[s]||{})[g])}</td>`).join('')}</tr>`).join('');
+  const dname = (Kinship.DIALECTS[kinDialect]||{}).name || '普通话';
+  ov.innerHTML = `<div class="kc-box">
+    <div class="kc-head"><div><b>亲戚图表</b> · 以「${escapeHtml(personById(viewerId).name)}」为我 · ${escapeHtml(dname)}</div><button type="button" class="btn btn-ghost" data-kc="close">关闭</button></div>
+    <div class="kc-scroll"><table class="kc"><thead><tr><th></th>${cols.map(g=>`<th>${GEN[g]||(g<0?'上'+(-g)+'辈':'下'+g+'辈')}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
+    ${skipped ? `<div class="kc-foot">另有 ${skipped} 位关系较远或资料不全（缺性别、长幼等），未列入。</div>` : ''}
+  </div>`;
+  ov.style.display = 'flex';
+  ov.querySelector('[data-kc="close"]').onclick = ()=>{ ov.style.display='none'; };
+  ov.querySelectorAll('.kc-item').forEach(el=>el.onclick = ()=>{ ov.style.display='none'; enterFocus(el.dataset.id); });
+}
 function updateViewerBar(){
   const fb = document.getElementById('focusViewerBtn');
   if(fb) fb.textContent = (viewerId && viewerId===focusPersonId) ? '取消「我」视角' : '以此人为「我」';
@@ -1000,6 +1035,7 @@ function updateViewerBar(){
   bar.innerHTML = `<span>当前视角：<b>${escapeHtml(personById(viewerId).name)}</b></span>
     <button type="button" data-kin="mode">${labels[kinMode]}</button>
     <button type="button" data-kin="dialect" title="${(Kinship.DIALECTS[kinDialect]||{}).unverified ? '这套叫法尚未逐条核实，可在详情面板里点「改叫法」改成你家的' : '切换称谓体系'}">${escapeHtml(((window.Kinship&&Kinship.DIALECTS[kinDialect])||{}).name||'普通话')}</button>
+    <button type="button" data-kin="chart" title="以亲戚图表查看">图表</button>
     <button type="button" data-kin="off" title="退出视角">✕</button>`;
   bar.querySelector('[data-kin="mode"]').onclick = ()=>{
     kinMode = kinMode==='both' ? 'title' : kinMode==='title' ? 'name' : 'both';
@@ -1010,6 +1046,7 @@ function updateViewerBar(){
     kinDialect = keys[(keys.indexOf(kinDialect)+1) % keys.length];
     render(); renderSidePanel(); scheduleSaveViewState();
   };
+  bar.querySelector('[data-kin="chart"]').onclick = openKinChart;
   bar.querySelector('[data-kin="off"]').onclick = ()=>{ viewerId=null; render(); renderSidePanel(); scheduleSaveViewState(); };
 }
 

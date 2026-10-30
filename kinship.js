@@ -237,6 +237,17 @@ function compact(title){
   return x+'/'+y.slice(i)+(m[2]||'');
 }
 
+/* 图表用：辈分（相对"我"，负数为长辈）与所属区块 p父系 / m母系 / self本人这一辈及晚辈 / s配偶一方 */
+function placeOf(P, es){
+  const gen = es.filter(e=>e==='U').length - es.filter(e=>e==='D').length;
+  let side='self';
+  if(es.length){
+    if(es[0]==='S') side = es.length===1 ? 'self' : 's';
+    else if(es[0]==='U' && es[1]!=='D') side = P[1].gender==='M' ? 'p' : P[1].gender==='F' ? 'm' : 'self';
+  }
+  return {gen:-gen, side};
+}
+
 /* ---------- 主入口 ---------- */
 function compute(people, meId, opts){
   const dialect = (opts && opts.dialect) || 'mandarin', custom = (opts && opts.custom) || {};
@@ -245,7 +256,7 @@ function compute(people, meId, opts){
   const {byId,best,pick} = search(people, meId);
   pick.forEach(({ky,c},id)=>{
     const {ns,es} = pathTo(best,ky), P = ns.map(x=>byId.get(x));
-    const info = {title:null, chain:chainText(P,es), hint:''};
+    const info = {title:null, chain:chainText(P,es), hint:'', place:placeOf(P,es)};
     PENDING.length = 0;
     try{
       const nS = es.filter(e=>e==='S').length;
