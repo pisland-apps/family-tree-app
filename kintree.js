@@ -258,7 +258,7 @@ function renderHtml(L, ctx){
   parts.push('</svg>');
   parts.push(`<div class="kt-title"><b>亲戚称呼图表</b><span>${esc(ctx.subtitle||'')}</span></div>`);
   L.heads.forEach(h=>parts.push(`<div class="kt-head" style="left:${h.x}px;width:${h.w}px">${esc(h.text)}</div>`));
-  L.bands.forEach(b=>parts.push(`<div class="kt-band" style="top:${b.y}px;height:${b.h}px"><span>${esc(b.label)}</span></div>`));
+  L.bands.forEach(b=>parts.push(`<div class="kt-band" style="top:${b.y}px;height:${b.h}px">${Array.from(b.label).map(c=>`<i>${esc(c)}</i>`).join('')}</div>`));
   L.nodes.forEach(n=>{
     const p = ctx.personById(n.id); if(!p) return;
     const g = p.gender==='F' ? 'f' : p.gender==='M' ? 'm' : 'o';
