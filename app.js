@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.16';
+const APP_VERSION = 'v8.19';
 const APP_VERSION_DATE = '2026-10-30';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -944,12 +944,17 @@ function orderPeople(level){
 
 /* ============ v8.11: 亲戚称谓（视角） ============ */
 let viewerId = null;          // 设为「我」的人；只存本机视图状态，不进家谱数据
+const KIN_CUSTOM_KEY = 'ft_kin_custom_v1';   // 自定义叫法：只存称谓文字，不含人名，仅本机
+let kinCustom = (()=>{ try{ const o = JSON.parse(localStorage.getItem(KIN_CUSTOM_KEY)||'{}'), r = {};
+  Object.keys(o||{}).forEach(d=>{ r[d] = {}; Object.keys(o[d]||{}).forEach(s=>{ if(typeof o[d][s]==='string') r[d][s] = o[d][s].slice(0,12); }); });
+  return r; }catch(e){ return {}; } })();
+let kinDialect = 'mandarin';  // mandarin / hakka_sb
 let kinMode = 'both';         // both 名字+称谓 / name 只名字 / title 只称谓
 let kinMap = null;
 let lastCycleSig = '';
 function refreshKin(){
   if(viewerId && !personById(viewerId)) viewerId = null;
-  kinMap = (viewerId && window.Kinship) ? Kinship.compute(people, viewerId) : null;
+  kinMap = (viewerId && window.Kinship) ? Kinship.compute(people, viewerId, {dialect: kinDialect, custom: kinCustom[kinDialect]||{}}) : null;
   if(window.Kinship){
     const cyc = Kinship.detectCycles(people), sig = cyc.map(c=>c.join('>')).join(',');
     if(sig && sig!==lastCycleSig){
@@ -961,6 +966,14 @@ function refreshKin(){
   updateViewerBar();
 }
 function kinInfo(id){ return kinMap ? kinMap.get(id) : null; }
+function editKinTitle(std, current){
+  const v = prompt('「'+std+'」在你家怎么叫？（留空＝恢复默认）', current||'');
+  if(v===null) return;
+  const t = v.trim().slice(0,12), m = (kinCustom[kinDialect] = kinCustom[kinDialect]||{});
+  if(t) m[std] = t; else delete m[std];
+  try{ localStorage.setItem(KIN_CUSTOM_KEY, JSON.stringify(kinCustom)); }catch(e){}
+  render(); renderSidePanel();
+}
 function setViewer(id){
   viewerId = (viewerId===id) ? null : id;
   render(); renderSidePanel(); scheduleSaveViewState();
@@ -976,10 +989,16 @@ function updateViewerBar(){
   bar.style.display='flex';
   bar.innerHTML = `<span>当前视角：<b>${escapeHtml(personById(viewerId).name)}</b></span>
     <button type="button" data-kin="mode">${labels[kinMode]}</button>
+    <button type="button" data-kin="dialect" title="${(Kinship.DIALECTS[kinDialect]||{}).unverified ? '这套叫法尚未逐条核实，可在详情面板里点「改叫法」改成你家的' : '切换称谓体系'}">${escapeHtml(((window.Kinship&&Kinship.DIALECTS[kinDialect])||{}).name||'普通话')}</button>
     <button type="button" data-kin="off" title="退出视角">✕</button>`;
   bar.querySelector('[data-kin="mode"]').onclick = ()=>{
     kinMode = kinMode==='both' ? 'title' : kinMode==='title' ? 'name' : 'both';
     render(); scheduleSaveViewState();
+  };
+  bar.querySelector('[data-kin="dialect"]').onclick = ()=>{
+    const keys = Object.keys(Kinship.DIALECTS);
+    kinDialect = keys[(keys.indexOf(kinDialect)+1) % keys.length];
+    render(); renderSidePanel(); scheduleSaveViewState();
   };
   bar.querySelector('[data-kin="off"]').onclick = ()=>{ viewerId=null; render(); renderSidePanel(); scheduleSaveViewState(); };
 }
@@ -1170,7 +1189,7 @@ function makeCard(p){
   const kinTitle = kin && kin.title;
   const showName = !(kin && kinMode==='title' && kinTitle);
   const kinLine = (kin && kinMode!=='name') ? `<div class="ckin${kinTitle?'':' ckin-none'}">${escapeHtml(kinTitle || (p.id===viewerId?'我':'—'))}</div>` : '';
-  if(kin) card.title = (kinTitle ? kinTitle+'：' : '') + (kin.chain || '') + (kin.hint ? '（'+kin.hint+'）' : '');
+  if(kin) card.title = (kinTitle ? kinTitle+(kin.std&&kin.std!==kinTitle?'（'+kin.std+'）':'')+(kin.alts&&kin.alts.length?'（又作：'+kin.alts.join('/')+'）':'')+'：' : '') + (kin.chain || '') + (kin.hint ? '（'+kin.hint+'）' : '');
   if(p.id===viewerId) card.classList.add('is-viewer');
   card.innerHTML = `
     ${collapseBtn}
@@ -1579,6 +1598,7 @@ function saveViewState(){
       focusSidewaysLevels: Array.from(focusSidewaysLevels),
       viewerId: viewerId,
       kinMode: kinMode,
+      kinDialect: kinDialect,
       zoom: zoom,
       pan: { x: pan.x, y: pan.y }
     }));
@@ -1601,6 +1621,7 @@ function applySavedViewState(v){
   if(!v || typeof v!=='object') return false;
   if(typeof v.viewerId==='string' && personById(v.viewerId)) viewerId = v.viewerId;
   if(['both','name','title'].includes(v.kinMode)) kinMode = v.kinMode;
+  if(window.Kinship && Kinship.DIALECTS[v.kinDialect]) kinDialect = v.kinDialect;
   if(!trees.some(t=>t.id===v.treeId)) return false;
   currentTreeId = v.treeId;
   if(v.focusPersonId && personById(v.focusPersonId)){
@@ -2204,12 +2225,12 @@ function renderSidePanel(){
   const spouses = (p.spouses||[]).map(personById).filter(Boolean);
   const kids = childrenOf(p.id);
 
-  function chip(person){
+  function chip(person, tag){
     const avatarInner = person.photo ? `<img src="${escapeHtml(person.photo)}">` : initials(person.name);
     const hiddenTag = person.hidden ? '<span style="color:var(--danger);">（已隐藏）</span>' : '';
     return `<div class="rel-chip" data-goto="${escapeHtml(person.id)}">
       <div class="mini-avatar">${avatarInner}</div>
-      <div>${escapeHtml(person.name)}${hiddenTag}</div>
+      <div>${escapeHtml(person.name)}${tag?` <span class="hint">（${tag}）</span>`:''}${hiddenTag}</div>
     </div>`;
   }
 
@@ -2227,11 +2248,11 @@ function renderSidePanel(){
     ${p.notes ? `<div class="detail-notes">${escapeHtml(p.notes)}</div>` : ''}
 
     ${(()=>{ const k = kinInfo(p.id); if(!k) return '';
-      return `<div class="kin-box"><div class="kin-title">${p.id===viewerId ? '我（当前视角）' : (k.title ? '称呼：<b>'+escapeHtml(k.title)+'</b>' : '<span class="hint">暂无称谓</span>')}</div>
-        <div class="kin-chain">${escapeHtml(k.chain)}</div>${k.hint ? `<div class="kin-hint">${escapeHtml(k.hint)}</div>` : ''}</div>`; })()}
+      return `<div class="kin-box"><div class="kin-title">${p.id===viewerId ? '我（当前视角）' : (k.title ? '称呼：<b>'+escapeHtml(k.title)+'</b>'+(k.std&&k.std!==k.title?' <span class="hint">（普通话：'+escapeHtml(k.std)+(k.alts&&k.alts.length?'；又作：'+escapeHtml(k.alts.join('/')):'')+'）</span>':'') : '<span class="hint">暂无称谓</span>')}</div>
+        <div class="kin-chain">${escapeHtml(k.chain)}</div>${(k.std && !k.std.includes('/') && p.id!==viewerId) ? '<button type="button" class="btn btn-ghost" data-kin-edit="1" style="margin-top:4px; padding:2px 8px; font-size:12px;">改叫法</button>' : ''}${k.hint ? `<div class="kin-hint">${escapeHtml(k.hint)}</div>` : ''}</div>`; })()}
 
     <div class="detail-section-title">父母</div>
-    <div class="rel-list">${parents.length? parents.map(x=>chip(x)).join('') : '<div class="hint">未记录</div>'}</div>
+    <div class="rel-list">${parents.length? parents.map(x=>chip(x, ({step:'继',adopt:'养'})[(p.parentTypes||{})[x.id]])).join('') : '<div class="hint">未记录</div>'}</div>
 
     <div class="detail-section-title">配偶</div>
     <div class="rel-list">${spouses.length? spouses.map(x=>chip(x)).join('') : '<div class="hint">未记录</div>'}</div>
@@ -2278,6 +2299,8 @@ function renderSidePanel(){
   panel.querySelector('[data-action="focus"]').addEventListener('click', ()=>{
     if(focusPersonId===p.id) exitFocus(); else enterFocus(p.id);
   });
+  const kinEdit = panel.querySelector('[data-kin-edit]');
+  if(kinEdit){ const k0 = kinInfo(p.id); kinEdit.addEventListener('click', ()=>editKinTitle(k0.std, (kinCustom[kinDialect]||{})[k0.std])); }
   panel.querySelector('[data-action="set-viewer"]').addEventListener('click', ()=>setViewer(p.id));
   const collapseBtn = panel.querySelector('[data-action="toggle-collapse"]');
   if(collapseBtn) collapseBtn.addEventListener('click', ()=>toggleCollapse(p.id));
@@ -2329,6 +2352,7 @@ function openModal(id, preset){
   document.getElementById('photoPreview').innerHTML = '👤';
   document.querySelectorAll('input[name=gender]').forEach(r=>r.checked = r.value==='M');
 
+  modalParentTypes = {};
   populateMultiSelect('parentsSelect', people, [], 4);
   populateMultiSelect('spousesSelect', people, [], 99);
 
@@ -2343,15 +2367,45 @@ function openModal(id, preset){
     modalPhotoId = p.photoId || null;
     if(photoSrc(p)) document.getElementById('photoPreview').innerHTML = `<img src="${escapeHtml(photoSrc(p))}">`;
     document.querySelectorAll('input[name=gender]').forEach(r=>r.checked = r.value===p.gender);
+    modalParentTypes = Object.assign({}, p.parentTypes||{});
     populateMultiSelect('parentsSelect', people.filter(x=>x.id!==id), p.parents||[], 4);
     populateMultiSelect('spousesSelect', people.filter(x=>x.id!==id), p.spouses||[], 99);
   } else if(modalPreset.presetParent){
     populateMultiSelect('parentsSelect', people, [modalPreset.presetParent], 4);
   }
 
+  renderParentTypes();
   overlay.classList.add('show');
   document.getElementById('fName').focus();
 }
+
+/* ===== v8.11+: 父母关系类型（亲生 / 继 / 养），记在 person.parentTypes 上 ===== */
+let modalParentTypes = {};
+function renderParentTypes(){
+  const row = document.getElementById('parentTypesRow');
+  if(!row) return;
+  const ids = Array.from(document.querySelectorAll('#parentsSelect input:checked')).map(i=>i.value);
+  if(!ids.length){ row.innerHTML=''; return; }
+  row.innerHTML = '<div class="hint" style="margin:6px 0 2px;">与每位父母的关系（影响称谓，如继母、养父）：</div>' + ids.map(id=>{
+    const p = personById(id); if(!p) return '';
+    const cur = modalParentTypes[id] || '';
+    return `<label class="ptype"><span>${escapeHtml(p.name)}</span>
+      <select data-ptype="${escapeHtml(id)}">
+        <option value=""${cur===''?' selected':''}>亲生</option>
+        <option value="step"${cur==='step'?' selected':''}>继（继父/继母）</option>
+        <option value="adopt"${cur==='adopt'?' selected':''}>养（养父/养母）</option>
+      </select></label>`;
+  }).join('');
+  row.querySelectorAll('select[data-ptype]').forEach(s=>{
+    s.addEventListener('change', ()=>{ modalParentTypes[s.dataset.ptype] = s.value; });
+  });
+}
+function collectParentTypes(parentIds){
+  const out = {};
+  parentIds.forEach(id=>{ const t = modalParentTypes[id]; if(t==='step'||t==='adopt') out[id]=t; });
+  return Object.keys(out).length ? out : undefined;
+}
+document.getElementById('parentsSelect').addEventListener('change', ()=>setTimeout(renderParentTypes,0));
 
 function populateMultiSelect(containerId, list, selectedIds, max){
   const el = document.getElementById(containerId);
@@ -2392,6 +2446,7 @@ function quickAddPerson(name, containerId, max){
   const excludeId = editingId;
   const list = people.filter(p=>p.id!==excludeId);
   populateMultiSelect(containerId, list, checked, max);
+  if(containerId==='parentsSelect') renderParentTypes();
   toast('已新建 ' + name);
   return newPerson.id;
 }
@@ -2435,6 +2490,7 @@ function saveModal(){
     p.name=name; p.gender=gender; p.birth=birth; p.death=death; p.country=country; p.notes=notes; p.birthOrder=birthOrder;
     p.photoId = modalPhotoId;
     p.parents = parentIds;
+    p.parentTypes = collectParentTypes(parentIds);
     p.spouses = spouseIds;
     spouseIds.forEach(sid=>{
       const sp = personById(sid);
@@ -2444,7 +2500,7 @@ function saveModal(){
     toast('已更新 ' + name);
   } else {
     const newId = uid();
-    const newPerson = { id:newId, name, gender, birth, death, country, notes, birthOrder, photoId: modalPhotoId, parents: parentIds, spouses: spouseIds, treeId: currentTreeId };
+    const newPerson = { id:newId, name, gender, birth, death, country, notes, birthOrder, photoId: modalPhotoId, parents: parentIds, parentTypes: collectParentTypes(parentIds), spouses: spouseIds, treeId: currentTreeId };
     people.push(newPerson);
     spouseIds.forEach(sid=>{
       const sp = personById(sid);

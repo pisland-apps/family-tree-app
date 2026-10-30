@@ -199,8 +199,41 @@ function chainText(P, es){
   return out.length ? '我的'+out.join('的') : '我自己';
 }
 
+/* ---------- 方言：在普通话称谓上叠一层"改叫法"表；表里没有的沿用普通话 ----------
+   值可以是字符串，或数组 [默认写法, 又作...]；用户自定义覆盖优先于任何方言表。
+   "沙巴"表以使用者家里的叫法为基准（外祖父=家公、外祖母=家婆、弟弟=老太[lau tai，谐音记号]），
+   其余为常见叫法，各地差异大，未逐条核实。 */
+const DIALECTS = {
+  mandarin: {name:'普通话', map:{}},
+  hakka_sb: {name:'客家话（沙巴）', unverified:true, map:{
+    '外祖父':['家公','毑公'],'外祖母':['家婆','毑婆'],'弟弟':['老太','老弟'],
+    '父亲':'阿爸','母亲':'阿姆','祖父':'阿公','祖母':'阿婆','曾祖父':'公太','曾祖母':'婆太',
+    '伯父':'阿伯','伯母':'伯姆','叔叔':'阿叔','婶婶':['阿婶','叔姆'],'姑妈':'阿姑','舅舅':'阿舅','舅妈':'阿妗','姨妈':'阿姨',
+    '哥哥':'阿哥','姐姐':['阿姐','阿姊'],'妹妹':['阿妹','老妹'],'嫂嫂':'阿嫂','姐夫':['姐夫','姊丈'],'妹夫':['妹夫','妹婿'],
+    '儿子':'倈仔','女儿':'妹仔','女婿':'婿郎','儿媳':['新妇','心臼'],
+    '公公':'家官','婆婆':'家娘','妻子':'老婆','丈夫':'老公'
+  }}
+};
+function localize(title, dialect, custom){
+  const map = (DIALECTS[dialect]||DIALECTS.mandarin).map, cu = custom||{};
+  const m = title.match(/^(.*?)(（继\/养）)?$/), base = m[1], suffix = m[2]||'';
+  const one = x=>{ if(cu[x]) return [cu[x]]; const v=map[x]; return v ? (Array.isArray(v)?v:[v]) : [x]; };
+  const parts = base.split('/').map(one);
+  return {title: parts.map(v=>v[0]).join('/') + suffix, alts: parts.length===1 ? parts[0].slice(1) : []};
+}
+
+/* 并列称谓去掉重复前缀：远房表哥/远房表弟 → 远房表哥/弟 */
+function compact(title){
+  const m = title.match(/^(.*?)(（继\/养）)?$/), parts = m[1].split('/');
+  if(parts.length!==2) return title;
+  const [x,y] = parts; let i=0;
+  while(i<x.length && i<y.length-1 && x[i]===y[i]) i++;
+  return x+'/'+y.slice(i)+(m[2]||'');
+}
+
 /* ---------- 主入口 ---------- */
-function compute(people, meId){
+function compute(people, meId, opts){
+  const dialect = (opts && opts.dialect) || 'mandarin', custom = (opts && opts.custom) || {};
   const result = new Map();
   if(!people.some(p=>p.id===meId)) return result;
   const {byId,best,pick} = search(people, meId);
@@ -210,7 +243,14 @@ function compute(people, meId){
     try{
       const nS = es.filter(e=>e==='S').length;
       let t = nS===0 ? (blood(P,es)||{}).t : nS===1 ? withSpouse(P,es) : nS===2 ? withTwoSpouses(P,es) : null;
-      if(t){ info.title = t + (c.nb ? '（继/养）' : ''); if(t.includes('/')) info.hint = '补充排行或出生年份后可确定具体称谓'; }
+      let direct = null;   // 直接的继/养父母、继/养子女：用专名，不加后缀
+      if(es.length===1 && es[0]==='U' && (P[0].parentTypes||{})[P[1].id]) direct = {tp:P[0].parentTypes[P[1].id], g:P[1].gender, p:1};
+      if(es.length===1 && es[0]==='D' && (P[1].parentTypes||{})[P[0].id]) direct = {tp:P[1].parentTypes[P[0].id], g:P[1].gender, p:0};
+      if(direct && (direct.tp==='step'||direct.tp==='adopt') && (direct.g==='M'||direct.g==='F')){
+        t = (direct.tp==='step'?'继':'养') + (direct.p ? (direct.g==='M'?'父':'母') : (direct.g==='M'?'子':'女'));
+        info.std = t; info.title = t; result.set(id, info); return;
+      }
+      if(t){ info.std = t; const loc = localize(t, dialect, custom); info.title = compact(loc.title + (c.nb ? '（继/养）' : '')); info.alts = loc.alts; if(t.includes('/')) info.hint = '补充排行或出生年份后可确定具体称谓'; }
       else info.hint = '关系较远，暂无标准称谓';
     }catch(e){
       if(e.need) info.hint = '补充'+e.need+'后可显示称谓'; else if(e.hint) info.hint = e.hint; else throw e;
@@ -220,6 +260,6 @@ function compute(people, meId){
   return result;
 }
 
-const api = {compute, detectCycles};
+const api = {compute, detectCycles, DIALECTS};
 if(typeof module!=='undefined' && module.exports) module.exports = api; else root.Kinship = api;
 })(typeof window!=='undefined' ? window : globalThis);

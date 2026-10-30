@@ -933,6 +933,8 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
 .viewer-bar button{border:1px solid #d9cdbd; background:#faf6f0; border-radius:999px; padding:3px 10px; cursor:pointer; font:inherit;}
 .kin-box{margin:10px 0; padding:8px 10px; background:#fbf3ec; border-radius:8px; text-align:left; font-size:13px;}
 .kin-chain{color:#6b5b4b; margin-top:3px;} .kin-hint{color:#a05a2c; margin-top:3px; font-size:12px;}
+.ptype{display:flex; align-items:center; gap:8px; margin:3px 0; font-size:13px;}
+.ptype select{padding:2px 6px; border:1px solid #d9cdbd; border-radius:6px; font:inherit;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
   integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
@@ -1204,6 +1206,7 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
       <div class="field" id="parentsField">
         <label>父母（最多选4位，可用于继父/继母等特殊情况）</label>
         <div class="multi-select" id="parentsSelect"></div>
+        <div id="parentTypesRow"></div>
         <div class="quick-add-row">
           <input type="text" id="parentQuickName" placeholder="家谱里还没有？输入姓名新建一位…">
           <button type="button" class="btn btn-ghost" id="parentQuickAdd">+ 新建</button>
