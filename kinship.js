@@ -120,11 +120,18 @@ function blood(P, es){
   }
   if(a===2&&b===2){
     const pre = (sx(P[1],1,0) && sx(P[3],1,0)) ? '堂':'表', o=older(last,me);
-    return {t:pre+sx(last,o>0?'哥':'弟',o>0?'姐':'妹'),k:'cousin'};
+    return {t:pre+sx(last,o>0?'哥':'弟',o>0?'姐':'妹'),k:'cousin',o};
   }
   if(a===2&&b===3){
     const pre = (sx(P[1],1,0) && sx(P[3],1,0)) ? '堂':'表';
     return {t:pre+sx(P[4],'侄','外甥')+sx(last,'子','女'),k:'cn'};
+  }
+  if(a===3&&b===2){ // 祖辈兄弟姐妹的子女：堂/表伯叔、表姑妈、表舅、表姨妈
+    const p1=P[1], paternal=sx(p1,1,0);
+    if(!sx(last,1,0)) return {t:paternal?'表姑妈':'表姨妈',k:'pcousin'};
+    if(!paternal) return {t:'表舅',k:'pcousin'};
+    const pre=(sx(P[2],1,0)&&sx(P[4],1,0))?'堂':'表';
+    return {t:pre+(older(last,p1)>0?'伯':'叔'),k:'pcousin'};
   }
   if(a===3&&b===1){
     const g1m=sx(P[1],1,0), g2m=sx(P[2],1,0);
@@ -133,12 +140,16 @@ function blood(P, es){
   }
   return null;
 }
-const UNCLE_SPOUSE = {'伯父':'伯母','叔叔':'婶婶','舅舅':'舅妈','姑妈':'姑丈','姨妈':'姨丈'};
+const SPOUSE_OF = {'伯父':'伯母','叔叔':'婶婶','舅舅':'舅妈','姑妈':'姑丈','姨妈':'姨丈',
+  '堂伯':'堂伯母','堂叔':'堂婶','表伯':'表伯母','表叔':'表婶','表姑妈':'表姑丈','表舅':'表舅妈','表姨妈':'表姨丈',
+  '伯祖父':'伯祖母','叔祖父':'叔祖母','姑奶奶':'姑爷','大姥爷':'大姥姥','小姥爷':'小姥姥','姑姥姥':'姑姥爷',
+  '舅爷':'舅奶奶','舅姥爷':'舅姥姥','姨奶奶':'姨爷','姨姥姥':'姨姥爷'};
 
 /* ---------- 含一条配偶边的路径 ---------- */
 function withSpouse(P, es){
   const i=es.indexOf('S'), me=P[0], last=P[P.length-1];
   if(es.length===1) return sx(last,'丈夫','妻子');
+  if(es.join('')==='DSU') return sx(last,'亲家公','亲家母'); // 子女配偶的父母
   if(i===0){ // 我 → 配偶 → 配偶的血亲
     const r=blood(P.slice(1), es.slice(1)); if(!r) return null;
     const m = sx(me,1,0);
@@ -151,9 +162,19 @@ function withSpouse(P, es){
     const rel=P[P.length-2], r=blood(P.slice(0,-1), es.slice(0,-1)); if(!r) return null;
     if(r.k==='sib') return sx(rel, older(rel,me)>0?'嫂嫂':'弟媳', older(rel,me)>0?'姐夫':'妹夫');
     if(r.k==='child') return sx(rel,'儿媳','女婿');
-    if(r.k==='uncle') return UNCLE_SPOUSE[r.t]||null;
+    if(r.k==='uncle'||r.k==='pcousin'||r.k==='gsib') return SPOUSE_OF[r.t]||null;
+    if(r.k==='cousin'){ const pre=r.t[0]; return sx(rel, pre+(r.o>0?'嫂':'弟媳'), pre+(r.o>0?'姐夫':'妹夫')); }
     if(r.k==='parent') return sx(rel,'继母','继父');
   }
+  return null;
+}
+
+/* ---------- 含两条配偶边：连襟（妻子的姐妹的丈夫）、妯娌（丈夫的兄弟的妻子） ---------- */
+function withTwoSpouses(P, es){
+  if(es.join('')!=='SUDS') return null;
+  const m=sx(P[0],1,0), sibM=sx(P[3],1,0), lastM=sx(P[P.length-1],1,0);
+  if(m && !sibM && lastM) return '连襟';
+  if(!m && sibM && !lastM) return '妯娌';
   return null;
 }
 
@@ -183,7 +204,7 @@ function compute(people, meId){
     const info = {title:null, chain:chainText(P,es), hint:''};
     try{
       const nS = es.filter(e=>e==='S').length;
-      let t = nS===0 ? (blood(P,es)||{}).t : nS===1 ? withSpouse(P,es) : null;
+      let t = nS===0 ? (blood(P,es)||{}).t : nS===1 ? withSpouse(P,es) : nS===2 ? withTwoSpouses(P,es) : null;
       if(t){ info.title = t + (c.nb ? '（继/养）' : ''); }
       else info.hint = '关系较远，暂无标准称谓';
     }catch(e){
