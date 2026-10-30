@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.25';
+const APP_VERSION = 'v8.26';
 const APP_VERSION_DATE = '2026-10-30';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2334,7 +2334,7 @@ function renderSidePanel(){
         <div class="kin-chain">${escapeHtml(k.chain)}</div>${(k.ageQ && personById(k.ageQ[0]) && personById(k.ageQ[1])) ? `<div class="kin-age">「${escapeHtml(personById(k.ageQ[0]).name)}」和「${escapeHtml(personById(k.ageQ[1]).name)}」年份相同或缺失，谁更大？<br><button type="button" class="btn btn-ghost" data-elder="${escapeHtml(k.ageQ[0])}|${escapeHtml(k.ageQ[1])}">${escapeHtml(personById(k.ageQ[0]).name)} 大</button> <button type="button" class="btn btn-ghost" data-elder="${escapeHtml(k.ageQ[1])}|${escapeHtml(k.ageQ[0])}">${escapeHtml(personById(k.ageQ[1]).name)} 大</button></div>` : ''}${(k.std && !k.std.includes('/') && p.id!==viewerId) ? '<button type="button" class="btn btn-ghost" data-kin-edit="1" style="margin-top:4px; padding:2px 8px; font-size:12px;">改叫法</button>' : ''}${k.hint ? `<div class="kin-hint">${escapeHtml(k.hint)}</div>` : ''}</div>`; })()}
 
     <div class="detail-section-title">父母</div>
-    <div class="rel-list">${parents.length? parents.map(x=>chip(x, ({step:'继',adopt:'养'})[(p.parentTypes||{})[x.id]])).join('') : '<div class="hint">未记录</div>'}</div>
+    <div class="rel-list">${parents.length? parents.map(x=>chip(x, ({step:'继',adopt:'养',god:'干'})[(p.parentTypes||{})[x.id]])).join('') : '<div class="hint">未记录</div>'}</div>
 
     <div class="detail-section-title">配偶</div>
     <div class="rel-list">${spouses.length? spouses.map(x=>chip(x)).join('') : '<div class="hint">未记录</div>'}</div>
@@ -2469,7 +2469,7 @@ function renderParentTypes(){
   if(!row) return;
   const ids = Array.from(document.querySelectorAll('#parentsSelect input:checked')).map(i=>i.value);
   if(!ids.length){ row.innerHTML=''; return; }
-  row.innerHTML = '<div class="hint" style="margin:6px 0 2px;">与每位父母的关系（影响称谓，如继母、养父）：</div>' + ids.map(id=>{
+  row.innerHTML = '<div class="hint" style="margin:6px 0 2px;">与每位父母的关系（影响称谓，如继母、养父、干爹）：</div>' + ids.map(id=>{
     const p = personById(id); if(!p) return '';
     const cur = modalParentTypes[id] || '';
     return `<label class="ptype"><span>${escapeHtml(p.name)}</span>
@@ -2477,6 +2477,7 @@ function renderParentTypes(){
         <option value=""${cur===''?' selected':''}>亲生</option>
         <option value="step"${cur==='step'?' selected':''}>继（继父/继母）</option>
         <option value="adopt"${cur==='adopt'?' selected':''}>养（养父/养母）</option>
+        <option value="god"${cur==='god'?' selected':''}>干（干爹/干妈 · 契爷/契娘）</option>
       </select></label>`;
   }).join('');
   row.querySelectorAll('select[data-ptype]').forEach(s=>{
@@ -2485,7 +2486,7 @@ function renderParentTypes(){
 }
 function collectParentTypes(parentIds){
   const out = {};
-  parentIds.forEach(id=>{ const t = modalParentTypes[id]; if(t==='step'||t==='adopt') out[id]=t; });
+  parentIds.forEach(id=>{ const t = modalParentTypes[id]; if(t==='step'||t==='adopt'||t==='god') out[id]=t; });
   return Object.keys(out).length ? out : undefined;
 }
 document.getElementById('parentsSelect').addEventListener('change', ()=>setTimeout(renderParentTypes,0));
@@ -2879,7 +2880,7 @@ function validateAndNormalizePeople(rawPeople){
       hidden: !!raw.hidden,
       collapsed: !!raw.collapsed,
       elder: Array.isArray(raw.elder) ? raw.elder.filter(x=>typeof x==='string').slice(0,50) : undefined,
-      parentTypes: (raw.parentTypes && typeof raw.parentTypes==='object' && !Array.isArray(raw.parentTypes)) ? Object.fromEntries(Object.entries(raw.parentTypes).filter(([k,v])=>(v==='step'||v==='adopt')).slice(0,8)) : undefined,
+      parentTypes: (raw.parentTypes && typeof raw.parentTypes==='object' && !Array.isArray(raw.parentTypes)) ? Object.fromEntries(Object.entries(raw.parentTypes).filter(([k,v])=>(v==='step'||v==='adopt'||v==='god')).slice(0,8)) : undefined,
       orderHints: (raw.orderHints && typeof raw.orderHints==='object' && !Array.isArray(raw.orderHints)) ? raw.orderHints : undefined,
     });
   }

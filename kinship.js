@@ -217,12 +217,13 @@ const DIALECTS = {
     '伯父':'阿伯','伯母':'伯姆','叔叔':'阿叔','婶婶':['阿婶','叔姆'],'姑妈':'阿姑','舅舅':'阿舅','舅妈':'阿妗','姨妈':'阿姨',
     '哥哥':'阿哥','姐姐':['阿姐','阿姊'],'妹妹':['阿妹','老妹'],'嫂嫂':'阿嫂','姐夫':['姐夫','姊丈'],'妹夫':['妹夫','妹婿'],
     '儿子':'倈仔','女儿':'妹仔','女婿':'婿郎','儿媳':['新妇','心臼'],
-    '公公':'家官','婆婆':'家娘','妻子':'老婆','丈夫':'老公'
+    '公公':'家官','婆婆':'家娘','妻子':'老婆','丈夫':'老公',
+    '干爹':['契爺','契爸'],'干妈':['契娘','契妈'],'干儿子':'契仔','干女儿':'契女'
   }}
 };
 function localize(title, dialect, custom){
   const map = (DIALECTS[dialect]||DIALECTS.mandarin).map, cu = custom||{};
-  const m = title.match(/^(.*?)(（继\/养）)?$/), base = m[1], suffix = m[2]||'';
+  const m = title.match(/^(.*?)(（[^）]*）)?$/), base = m[1], suffix = m[2]||'';
   const one = x=>{ if(cu[x]) return [cu[x]]; const v=map[x]; return v ? (Array.isArray(v)?v:[v]) : [x]; };
   const parts = base.split('/').map(one);
   return {title: parts.map(v=>v[0]).join('/') + suffix, alts: parts.length===1 ? parts[0].slice(1) : []};
@@ -230,7 +231,7 @@ function localize(title, dialect, custom){
 
 /* 并列称谓去掉重复前缀：远房表哥/远房表弟 → 远房表哥/弟 */
 function compact(title){
-  const m = title.match(/^(.*?)(（继\/养）)?$/), parts = m[1].split('/');
+  const m = title.match(/^(.*?)(（[^）]*）)?$/), parts = m[1].split('/');
   if(parts.length!==2) return title;
   const [x,y] = parts; let i=0;
   while(i<x.length && i<y.length-1 && x[i]===y[i]) i++;
@@ -261,14 +262,20 @@ function compute(people, meId, opts){
     try{
       const nS = es.filter(e=>e==='S').length;
       let t = nS===0 ? (blood(P,es)||{}).t : nS===1 ? withSpouse(P,es) : nS===2 ? withTwoSpouses(P,es) : null;
-      let direct = null;   // 直接的继/养父母、继/养子女：用专名，不加后缀
+      let direct = null;   // 直接的继/养父母、继/养子女：用专名，不加后缀；干亲（god）另有专名
       if(es.length===1 && es[0]==='U' && (P[0].parentTypes||{})[P[1].id]) direct = {tp:P[0].parentTypes[P[1].id], g:P[1].gender, p:1};
       if(es.length===1 && es[0]==='D' && (P[1].parentTypes||{})[P[0].id]) direct = {tp:P[1].parentTypes[P[0].id], g:P[1].gender, p:0};
+      if(direct && direct.tp==='god' && (direct.g==='M'||direct.g==='F')){   // v8.26: 干亲（契爷/契仔），可按方言改叫法
+        t = direct.p ? (direct.g==='M'?'干爹':'干妈') : (direct.g==='M'?'干儿子':'干女儿');
+        const loc = localize(t, dialect, custom);
+        info.std = t; info.title = loc.title; info.alts = loc.alts; result.set(id, info); return;
+      }
       if(direct && (direct.tp==='step'||direct.tp==='adopt') && (direct.g==='M'||direct.g==='F')){
         t = (direct.tp==='step'?'继':'养') + (direct.p ? (direct.g==='M'?'父':'母') : (direct.g==='M'?'子':'女'));
         info.std = t; info.title = t; result.set(id, info); return;
       }
-      if(t){ info.std = t; const loc = localize(t, dialect, custom); info.title = compact(loc.title + (c.nb ? '（继/养）' : '')); info.alts = loc.alts; if(t.includes('/')) info.hint = '补充出生年份或排行，或在详情面板指定谁大，即可确定'; }
+      if(t){ info.std = t; const loc = localize(t, dialect, custom); const viaGod = es.some((e,i)=>{ const ch = e==='U' ? P[i] : e==='D' ? P[i+1] : null, pa = e==='U' ? P[i+1] : e==='D' ? P[i] : null; return ch && ((ch.parentTypes||{})[pa.id]==='god'); });
+        info.title = compact(loc.title + (viaGod ? '（干亲）' : c.nb ? '（继/养）' : '')); info.alts = loc.alts; if(t.includes('/')) info.hint = '补充出生年份或排行，或在详情面板指定谁大，即可确定'; }
       else info.hint = '关系较远，暂无标准称谓';
     }catch(e){
       info.ageQ = null;
