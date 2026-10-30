@@ -76,6 +76,7 @@ function pathTo(best, ky){
 }
 
 /* ---------- 长幼：同父母兄弟优先比排行，其次比出生年份；比不出来就报"缺数据" ---------- */
+const PENDING = [];   // 本次计算中比不出长幼的人对 [a.id,b.id]，用于界面询问
 function cmpAge(a,b){
   const pa=a.parents||[], pb=b.parents||[];
   const full = pa.length>0 && pa.length===pb.length && pa.every(x=>pb.includes(x)); // 父母完全相同才信排行
@@ -83,11 +84,16 @@ function cmpAge(a,b){
   const byYear = (!isNaN(x)&&!isNaN(y)&&x!==y) ? (x<y?1:-1) : 0;
   const byOrder = (full && a.birthOrder && b.birthOrder && a.birthOrder!==b.birthOrder) ? (a.birthOrder<b.birthOrder?1:-1) : 0;
   if(byYear && byOrder && byYear!==byOrder) return NaN;   // 年份与排行矛盾：不猜
+  if(!byYear && !byOrder){   // 同年或缺年份：用户手动指定的"谁更大"（person.elder = 比其年幼的人 id 列表）
+    if((a.elder||[]).includes(b.id)) return 1;
+    if((b.elder||[]).includes(a.id)) return -1;
+  }
   return byYear || byOrder;
 }
 const older = (a,b)=>{
   const c=cmpAge(a,b);
   if(Number.isNaN(c)){ const e=new Error('conflict'); e.hint='「'+a.name+'」与「'+b.name+'」的排行和出生年份互相矛盾，请检查'; throw e; }
+  if(!c) PENDING.push([a.id,b.id]);
   return c;
 };
 const ab = (o,x,y)=> o>0 ? x : o<0 ? y : x+'/'+y;   // 长幼未知时两个都给
@@ -240,6 +246,7 @@ function compute(people, meId, opts){
   pick.forEach(({ky,c},id)=>{
     const {ns,es} = pathTo(best,ky), P = ns.map(x=>byId.get(x));
     const info = {title:null, chain:chainText(P,es), hint:''};
+    PENDING.length = 0;
     try{
       const nS = es.filter(e=>e==='S').length;
       let t = nS===0 ? (blood(P,es)||{}).t : nS===1 ? withSpouse(P,es) : nS===2 ? withTwoSpouses(P,es) : null;
@@ -250,11 +257,13 @@ function compute(people, meId, opts){
         t = (direct.tp==='step'?'继':'养') + (direct.p ? (direct.g==='M'?'父':'母') : (direct.g==='M'?'子':'女'));
         info.std = t; info.title = t; result.set(id, info); return;
       }
-      if(t){ info.std = t; const loc = localize(t, dialect, custom); info.title = compact(loc.title + (c.nb ? '（继/养）' : '')); info.alts = loc.alts; if(t.includes('/')) info.hint = '补充排行或出生年份后可确定具体称谓'; }
+      if(t){ info.std = t; const loc = localize(t, dialect, custom); info.title = compact(loc.title + (c.nb ? '（继/养）' : '')); info.alts = loc.alts; if(t.includes('/')) info.hint = '补充出生年份或排行，或在详情面板指定谁大，即可确定'; }
       else info.hint = '关系较远，暂无标准称谓';
     }catch(e){
+      info.ageQ = null;
       if(e.need) info.hint = '补充'+e.need+'后可显示称谓'; else if(e.hint) info.hint = e.hint; else throw e;
     }
+    if(PENDING.length && info.title) info.ageQ = PENDING[0].slice();
     result.set(id, info);
   });
   return result;

@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.19';
+const APP_VERSION = 'v8.20';
 const APP_VERSION_DATE = '2026-10-30';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -978,7 +978,17 @@ function setViewer(id){
   viewerId = (viewerId===id) ? null : id;
   render(); renderSidePanel(); scheduleSaveViewState();
 }
+document.getElementById('focusViewerBtn').addEventListener('click', ()=>{ if(focusPersonId) setViewer(focusPersonId); });
+function setElder(aId, bId){   // a 比 b 大：记在 a.elder 上（属于家谱数据，随家谱保存/导出）
+  const a = personById(aId), b = personById(bId); if(!a||!b) return;
+  pushHistory();
+  b.elder = (b.elder||[]).filter(x=>x!==aId); if(!b.elder.length) delete b.elder;
+  a.elder = Array.from(new Set([...(a.elder||[]), bId]));
+  saveData(); render(); renderSidePanel();
+}
 function updateViewerBar(){
+  const fb = document.getElementById('focusViewerBtn');
+  if(fb) fb.textContent = (viewerId && viewerId===focusPersonId) ? '取消「我」视角' : '以此人为「我」';
   let bar = document.getElementById('viewerBar');
   if(!viewerId){ if(bar) bar.style.display='none'; return; }
   if(!bar){
@@ -1194,6 +1204,7 @@ function makeCard(p){
   card.innerHTML = `
     ${collapseBtn}
     <button class="card-info-btn" title="查看详情 / 编辑">i</button>
+    <button class="card-me-btn${p.id===viewerId?' on':''}" title="${p.id===viewerId?'取消「我」视角':'设为「我」（视角）'}">我</button>
     <div class="avatar"${isDeceased(p) ? ' title="已故"' : ''}>${avatarInner}</div>
     <div class="cname">${escapeHtml(showName ? p.name : kinTitle)}</div>
     ${kinLine}
@@ -1204,6 +1215,8 @@ function makeCard(p){
     ${p.notes ? `<div class="card-tooltip">${escapeHtml(p.notes)}</div>` : ''}
   `;
   card.addEventListener('click', ()=>enterFocus(p.id));
+  const meBtn = card.querySelector('.card-me-btn');
+  if(meBtn) meBtn.addEventListener('click', (e)=>{ e.stopPropagation(); setViewer(p.id); });
   const infoBtn = card.querySelector('.card-info-btn');
   if(infoBtn){
     infoBtn.addEventListener('click', (e)=>{
@@ -2249,7 +2262,7 @@ function renderSidePanel(){
 
     ${(()=>{ const k = kinInfo(p.id); if(!k) return '';
       return `<div class="kin-box"><div class="kin-title">${p.id===viewerId ? '我（当前视角）' : (k.title ? '称呼：<b>'+escapeHtml(k.title)+'</b>'+(k.std&&k.std!==k.title?' <span class="hint">（普通话：'+escapeHtml(k.std)+(k.alts&&k.alts.length?'；又作：'+escapeHtml(k.alts.join('/')):'')+'）</span>':'') : '<span class="hint">暂无称谓</span>')}</div>
-        <div class="kin-chain">${escapeHtml(k.chain)}</div>${(k.std && !k.std.includes('/') && p.id!==viewerId) ? '<button type="button" class="btn btn-ghost" data-kin-edit="1" style="margin-top:4px; padding:2px 8px; font-size:12px;">改叫法</button>' : ''}${k.hint ? `<div class="kin-hint">${escapeHtml(k.hint)}</div>` : ''}</div>`; })()}
+        <div class="kin-chain">${escapeHtml(k.chain)}</div>${(k.ageQ && personById(k.ageQ[0]) && personById(k.ageQ[1])) ? `<div class="kin-age">「${escapeHtml(personById(k.ageQ[0]).name)}」和「${escapeHtml(personById(k.ageQ[1]).name)}」年份相同或缺失，谁更大？<br><button type="button" class="btn btn-ghost" data-elder="${escapeHtml(k.ageQ[0])}|${escapeHtml(k.ageQ[1])}">${escapeHtml(personById(k.ageQ[0]).name)} 大</button> <button type="button" class="btn btn-ghost" data-elder="${escapeHtml(k.ageQ[1])}|${escapeHtml(k.ageQ[0])}">${escapeHtml(personById(k.ageQ[1]).name)} 大</button></div>` : ''}${(k.std && !k.std.includes('/') && p.id!==viewerId) ? '<button type="button" class="btn btn-ghost" data-kin-edit="1" style="margin-top:4px; padding:2px 8px; font-size:12px;">改叫法</button>' : ''}${k.hint ? `<div class="kin-hint">${escapeHtml(k.hint)}</div>` : ''}</div>`; })()}
 
     <div class="detail-section-title">父母</div>
     <div class="rel-list">${parents.length? parents.map(x=>chip(x, ({step:'继',adopt:'养'})[(p.parentTypes||{})[x.id]])).join('') : '<div class="hint">未记录</div>'}</div>
@@ -2299,6 +2312,7 @@ function renderSidePanel(){
   panel.querySelector('[data-action="focus"]').addEventListener('click', ()=>{
     if(focusPersonId===p.id) exitFocus(); else enterFocus(p.id);
   });
+  panel.querySelectorAll('[data-elder]').forEach(b=>b.addEventListener('click', ()=>{ const [x,y]=b.dataset.elder.split('|'); setElder(x,y); }));
   const kinEdit = panel.querySelector('[data-kin-edit]');
   if(kinEdit){ const k0 = kinInfo(p.id); kinEdit.addEventListener('click', ()=>editKinTitle(k0.std, (kinCustom[kinDialect]||{})[k0.std])); }
   panel.querySelector('[data-action="set-viewer"]').addEventListener('click', ()=>setViewer(p.id));
@@ -2774,6 +2788,7 @@ function validateAndNormalizePeople(rawPeople){
       treeId: importStr(raw.treeId) || undefined,
       hidden: !!raw.hidden,
       collapsed: !!raw.collapsed,
+      elder: Array.isArray(raw.elder) ? raw.elder.filter(x=>typeof x==='string').slice(0,50) : undefined,
       parentTypes: (raw.parentTypes && typeof raw.parentTypes==='object' && !Array.isArray(raw.parentTypes)) ? Object.fromEntries(Object.entries(raw.parentTypes).filter(([k,v])=>(v==='step'||v==='adopt')).slice(0,8)) : undefined,
       orderHints: (raw.orderHints && typeof raw.orderHints==='object' && !Array.isArray(raw.orderHints)) ? raw.orderHints : undefined,
     });
