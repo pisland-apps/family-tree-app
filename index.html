@@ -951,6 +951,36 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
 .kc-item b{display:block; color:#b4532a; font-size:13px;} .kc-item span{color:#6b5b4b;}
 .kc-item.me{background:#b4532a; border-color:#b4532a;} .kc-item.me b,.kc-item.me span{color:#fff;}
 .kc-foot{margin-top:6px; font-size:12px; color:#8a7a68;}
+/* v8.27 亲戚图表·树状视图 */
+.kc-ctl{display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
+.kc-seg{display:inline-flex; border:1px solid #d9c9ad; border-radius:8px; overflow:hidden;}
+.kc-seg button{border:0; background:#fff; padding:5px 12px; font-size:13px; cursor:pointer; color:#6b5b4b;}
+.kc-seg button.on{background:#b4532a; color:#fff;}
+.kc-tool{border:1px solid #d9c9ad; background:#fff; border-radius:8px; padding:5px 10px; font-size:13px; cursor:pointer; color:#6b5b4b;}
+.kt-sizer{position:relative;}
+.kt-wrap{overflow:auto; -webkit-overflow-scrolling:touch; background:#fbf7f0; border-radius:8px;}
+.kt-stage{position:relative; background:#fbf7f0; transform-origin:0 0; font-family:inherit;}
+.kt-lines{position:absolute; left:0; top:0; pointer-events:none;}
+.kt-bus{fill:none; stroke:#b9a789; stroke-width:1.5; stroke-linejoin:round;}
+.kt-sp{fill:none; stroke:#b4532a; stroke-width:2; stroke-linecap:round;}
+.kt-title{position:absolute; left:30px; top:8px; display:flex; align-items:baseline; gap:10px; color:#b4532a;}
+.kt-title b{font-size:17px; letter-spacing:2px;} .kt-title span{font-size:12px; color:#8a7a68;}
+.kt-head{position:absolute; top:36px; text-align:center; font-size:12px; color:#8a6d3b; font-weight:600;}
+.kt-band{position:absolute; left:4px; width:20px; display:flex; align-items:center; justify-content:center; background:rgba(180,83,42,.07); border-radius:6px;}
+.kt-band span{writing-mode:vertical-rl; white-space:nowrap; font-size:12px; color:#8a6d3b; letter-spacing:3px;}
+.kt-card{position:absolute; box-sizing:border-box; display:flex; align-items:center; gap:6px; padding:3px 6px 3px 4px; background:#fff; border:1px solid #e3d8c6; border-radius:23px; cursor:pointer;}
+.kt-av{flex:none; width:34px; height:34px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; color:#6b5b4b; background:#f1e8d6; border:2px solid #cdbd9f;}
+.kt-av img{width:100%; height:100%; object-fit:cover; display:block;}
+.g-m .kt-av{border-color:#7c9cc4; background:#e8f0fa;} .g-f .kt-av{border-color:#d18aa0; background:#fbebf0;}
+.kt-tx{min-width:0; display:flex; flex-direction:column; line-height:1.2;}
+.kt-tx b{color:#b4532a; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.kt-tx b.lg{font-size:11.5px;} .kt-tx b.xl{font-size:10px;}
+.kt-tx span{color:#6b5b4b; font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.kt-card.me{background:#b4532a; border-color:#b4532a;} .kt-card.me .kt-tx b,.kt-card.me .kt-tx span{color:#fff;}
+.kt-card.dead{border-style:dashed; opacity:.85;}
+.kt-pill{position:absolute; box-sizing:border-box; border:1px dashed #b4532a; background:#fff6ee; color:#b4532a; border-radius:14px; font-size:12px; cursor:pointer; padding:0;}
+.kt-pill.chip{border-color:#b9a789; background:#fff; color:#8a7a68;}
+
 .gen-label{z-index:4;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
@@ -1502,6 +1532,7 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
 <div class="toast" id="toast"></div>
 
 <script src="kinship.js"></script>
+<script src="kintree.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

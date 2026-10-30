@@ -3,8 +3,8 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.26';
-const APP_VERSION_DATE = '2026-10-30';
+const APP_VERSION = 'v8.27';
+const APP_VERSION_DATE = '2026-10-31';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
   if(el) el.textContent = `${APP_VERSION} · ${APP_VERSION_DATE}`;
@@ -1018,16 +1018,11 @@ function setElder(aId, bId){   // a 比 b 大：记在 a.elder 上（属于家�
   a.elder = Array.from(new Set([...(a.elder||[]), bId]));
   saveData(); render(); renderSidePanel();
 }
-/* ===== 亲戚图表：横向按辈分（左长辈→右晚辈），纵向分 父系 / 本人这一辈 / 母系 / 配偶一方 ===== */
-function openKinChart(){
-  if(!viewerId || !kinMap) return;
-  let ov = document.getElementById('kinChart');
-  if(!ov){
-    ov = document.createElement('div'); ov.id = 'kinChart'; ov.className = 'kin-chart';
-    document.body.appendChild(ov);
-    ov.addEventListener('click', e=>{ if(e.target===ov) ov.style.display='none'; });
-    document.addEventListener('keydown', e=>{ if(e.key==='Escape') ov.style.display='none'; });
-  }
+/* ===== 亲戚图表：弹窗里有 表格 / 树状 两个视图（v8.27 起） =====
+   表格：横向按辈分（左长辈→右晚辈），纵向分 父系 / 本人这一辈 / 母系 / 配偶一方
+   树状：kintree.js —— 真实存在的人 + 真实父母/配偶关系，我在中间、父系在上、母系在下，可折叠/缩放/存图 */
+const KIN_VIEW_KEY = 'ft_kin_chart_view_v1';   // 只记「上次看的是表格还是树状」，不含人名，仅本机
+function kinGridHtml(){
   const GEN = {'-4':'高祖辈','-3':'曾祖辈','-2':'祖辈','-1':'父辈','0':'平辈','1':'子辈','2':'孙辈','3':'曾孙辈'};
   const SECTIONS = [['p','父系'],['self','本人这一辈与晚辈'],['m','母系'],['s','配偶一方']];
   const cells = {}; const gens = new Set(); let skipped = 0;
@@ -1043,15 +1038,27 @@ function openKinChart(){
     `<div class="kc-item${it.id===viewerId?' me':''}" data-id="${escapeHtml(it.id)}" title="${escapeHtml(it.k.chain)}"><b>${escapeHtml(it.k.title)}</b><span>${escapeHtml(it.p.name)}</span></div>`).join('');
   const body = SECTIONS.filter(([s])=>cells[s]).map(([s,label])=>
     `<tr class="kc-${s}"><th>${label}</th>${cols.map(g=>`<td>${cell((cells[s]||{})[g])}</td>`).join('')}</tr>`).join('');
-  const dname = (Kinship.DIALECTS[kinDialect]||{}).name || '普通话';
-  ov.innerHTML = `<div class="kc-box">
-    <div class="kc-head"><div><b>亲戚图表</b> · 以「${escapeHtml(personById(viewerId).name)}」为我 · ${escapeHtml(dname)}</div><button type="button" class="btn btn-ghost" data-kc="close">关闭</button></div>
-    <div class="kc-scroll"><table class="kc"><thead><tr><th></th>${cols.map(g=>`<th>${GEN[g]||(g<0?'上'+(-g)+'辈':'下'+g+'辈')}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
-    ${skipped ? `<div class="kc-foot">另有 ${skipped} 位关系较远或资料不全（缺性别、长幼等），未列入。</div>` : ''}
-  </div>`;
-  ov.style.display = 'flex';
-  ov.querySelector('[data-kc="close"]').onclick = ()=>{ ov.style.display='none'; };
-  ov.querySelectorAll('.kc-item').forEach(el=>el.onclick = ()=>{ ov.style.display='none'; enterFocus(el.dataset.id); });
+  return {skipped, html: `<div class="kc-scroll"><table class="kc"><thead><tr><th></th>${cols.map(g=>`<th>${GEN[g]||(g<0?'上'+(-g)+'辈':'下'+g+'辈')}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`};
+}
+function openKinChart(){
+  if(!viewerId || !kinMap) return;
+  let ov = document.getElementById('kinChart');
+  if(!ov){
+    ov = document.createElement('div'); ov.id = 'kinChart'; ov.className = 'kin-chart';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e=>{ if(e.target===ov) ov.style.display='none'; });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') ov.style.display='none'; });
+  }
+  KinTree.show(ov, {
+    state: ()=>({people, kinMap, viewerId, viewerName: personById(viewerId).name, dname: (Kinship.DIALECTS[kinDialect]||{}).name || '普通话'}),
+    gridHtml: kinGridHtml,
+    ctx: {escapeHtml, personById, photoSrc, surnameChar, isDeceased},
+    viewGet: ()=>{ try{ return localStorage.getItem(KIN_VIEW_KEY)==='grid' ? 'grid' : 'tree'; }catch(e){ return 'tree'; } },
+    viewSet: v=>{ try{ localStorage.setItem(KIN_VIEW_KEY, v); }catch(e){} },
+    loadHtml2Canvas, toast,
+    pick: id=>enterFocus(id),
+    fileName: ()=>{ const t = trees.find(x=>x.id===currentTreeId); return `${(t && t.name) || '家谱'}-亲戚图表-${new Date().toISOString().slice(0,10)}.png`; }
+  });
 }
 function updateViewerBar(){
   const fb = document.getElementById('focusViewerBtn');
