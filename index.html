@@ -924,6 +924,15 @@ body.compact-view .card.selected.deceased .avatar{box-shadow:0 0 0 2px var(--bg)
 body.compact-view .card.focus-pulse .avatar{animation:ftPulse .8s ease-in-out 3;}
 body:not(.compact-view) .card.selected{outline:3px solid rgba(255,196,0,.85); outline-offset:2px;}
 body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
+
+/* v8.11 亲戚称谓视角 */
+.card .ckin{font-size:12px; font-weight:700; color:#b4532a; line-height:1.2; margin-top:1px;}
+.card .ckin-none{color:#999; font-weight:400;}
+.card.is-viewer{outline:2px solid #b4532a; outline-offset:2px;}
+.viewer-bar{position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:60; display:flex; gap:8px; align-items:center; padding:7px 12px; background:#fff; border:1px solid #d9cdbd; border-radius:999px; box-shadow:0 4px 14px rgba(0,0,0,.15); font-size:13px;}
+.viewer-bar button{border:1px solid #d9cdbd; background:#faf6f0; border-radius:999px; padding:3px 10px; cursor:pointer; font:inherit;}
+.kin-box{margin:10px 0; padding:8px 10px; background:#fbf3ec; border-radius:8px; text-align:left; font-size:13px;}
+.kin-chain{color:#6b5b4b; margin-top:3px;} .kin-hint{color:#a05a2c; margin-top:3px; font-size:12px;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
   integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
@@ -1471,6 +1480,7 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
 
 <div class="toast" id="toast"></div>
 
+<script src="kinship.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

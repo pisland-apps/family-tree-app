@@ -3,8 +3,8 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.10';
-const APP_VERSION_DATE = '2026-10-29';
+const APP_VERSION = 'v8.11';
+const APP_VERSION_DATE = '2026-10-30';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
   if(el) el.textContent = `${APP_VERSION} · ${APP_VERSION_DATE}`;
@@ -942,7 +942,50 @@ function orderPeople(level){
   return rows;
 }
 
+/* ============ v8.11: 亲戚称谓（视角） ============ */
+let viewerId = null;          // 设为「我」的人；只存本机视图状态，不进家谱数据
+let kinMode = 'both';         // both 名字+称谓 / name 只名字 / title 只称谓
+let kinMap = null;
+let lastCycleSig = '';
+function refreshKin(){
+  if(viewerId && !personById(viewerId)) viewerId = null;
+  kinMap = (viewerId && window.Kinship) ? Kinship.compute(people, viewerId) : null;
+  if(window.Kinship){
+    const cyc = Kinship.detectCycles(people), sig = cyc.map(c=>c.join('>')).join(',');
+    if(sig && sig!==lastCycleSig){
+      const nm = id=>(personById(id)||{}).name||'?';
+      toast(`检测到家谱有环：${nm(cyc[0][0])} 与 ${nm(cyc[0][1])} 互为祖先/后代（或配偶同时是父母），请检查，称谓可能不准`);
+    }
+    lastCycleSig = sig;
+  }
+  updateViewerBar();
+}
+function kinInfo(id){ return kinMap ? kinMap.get(id) : null; }
+function setViewer(id){
+  viewerId = (viewerId===id) ? null : id;
+  render(); renderSidePanel(); scheduleSaveViewState();
+}
+function updateViewerBar(){
+  let bar = document.getElementById('viewerBar');
+  if(!viewerId){ if(bar) bar.style.display='none'; return; }
+  if(!bar){
+    bar = document.createElement('div'); bar.id='viewerBar'; bar.className='viewer-bar';
+    document.body.appendChild(bar);
+  }
+  const labels = {both:'名字+称谓', name:'只名字', title:'只称谓'};
+  bar.style.display='flex';
+  bar.innerHTML = `<span>当前视角：<b>${escapeHtml(personById(viewerId).name)}</b></span>
+    <button type="button" data-kin="mode">${labels[kinMode]}</button>
+    <button type="button" data-kin="off" title="退出视角">✕</button>`;
+  bar.querySelector('[data-kin="mode"]').onclick = ()=>{
+    kinMode = kinMode==='both' ? 'title' : kinMode==='title' ? 'name' : 'both';
+    render(); scheduleSaveViewState();
+  };
+  bar.querySelector('[data-kin="off"]').onclick = ()=>{ viewerId=null; render(); renderSidePanel(); scheduleSaveViewState(); };
+}
+
 function render(){
+  refreshKin();
   const canvas = document.getElementById('canvas');
   const emptyState = document.getElementById('emptyState');
   canvas.innerHTML = '';
@@ -1123,11 +1166,18 @@ function makeCard(p){
       ${p.collapsed ? `<span class="collapse-count">${kidCount}</span>` : ''}
     </button>` : '';
   const bridgeBadge = bridge ? `<div class="bridge-badge" data-goto-tree="${escapeHtml(p.id)}" title="属于另一棵家族树，点击前往查看">🔗 ${escapeHtml((trees.find(t=>t.id===(p.treeId||'main'))||{}).name||'其他家族')}</div>` : '';
+  const kin = kinInfo(p.id);
+  const kinTitle = kin && kin.title;
+  const showName = !(kin && kinMode==='title' && kinTitle);
+  const kinLine = (kin && kinMode!=='name') ? `<div class="ckin${kinTitle?'':' ckin-none'}">${escapeHtml(kinTitle || (p.id===viewerId?'我':'—'))}</div>` : '';
+  if(kin) card.title = (kinTitle ? kinTitle+'：' : '') + (kin.chain || '') + (kin.hint ? '（'+kin.hint+'）' : '');
+  if(p.id===viewerId) card.classList.add('is-viewer');
   card.innerHTML = `
     ${collapseBtn}
     <button class="card-info-btn" title="查看详情 / 编辑">i</button>
     <div class="avatar"${isDeceased(p) ? ' title="已故"' : ''}>${avatarInner}</div>
-    <div class="cname">${escapeHtml(p.name)}</div>
+    <div class="cname">${escapeHtml(showName ? p.name : kinTitle)}</div>
+    ${kinLine}
     <div class="cspan">${escapeHtml(lifespanShort(p))}</div>
     <div class="corder">${escapeHtml(birthOrderLabel(p))}</div>
     <div class="cyears">${[birthOrderLabel(p), yearsLabel(p)].filter(Boolean).join(' · ')}</div>
@@ -1527,6 +1577,8 @@ function saveViewState(){
       focusDownGen: focusDownGen,
       focusDownSpouses: focusDownSpouses,
       focusSidewaysLevels: Array.from(focusSidewaysLevels),
+      viewerId: viewerId,
+      kinMode: kinMode,
       zoom: zoom,
       pan: { x: pan.x, y: pan.y }
     }));
@@ -1547,6 +1599,8 @@ function readViewState(){
 // was restored (so init() should skip the default centerTree()).
 function applySavedViewState(v){
   if(!v || typeof v!=='object') return false;
+  if(typeof v.viewerId==='string' && personById(v.viewerId)) viewerId = v.viewerId;
+  if(['both','name','title'].includes(v.kinMode)) kinMode = v.kinMode;
   if(!trees.some(t=>t.id===v.treeId)) return false;
   currentTreeId = v.treeId;
   if(v.focusPersonId && personById(v.focusPersonId)){
@@ -2172,6 +2226,10 @@ function renderSidePanel(){
     ${isBridgePerson(p.id) ? `<div class="bridge-notice" data-goto-tree-panel="${escapeHtml(p.id)}">🔗 属于「${escapeHtml((trees.find(t=>t.id===(p.treeId||'main'))||{}).name||'其他家族')}」— 点击前往查看</div>` : ''}
     ${p.notes ? `<div class="detail-notes">${escapeHtml(p.notes)}</div>` : ''}
 
+    ${(()=>{ const k = kinInfo(p.id); if(!k) return '';
+      return `<div class="kin-box"><div class="kin-title">${p.id===viewerId ? '我（当前视角）' : (k.title ? '称呼：<b>'+escapeHtml(k.title)+'</b>' : '<span class="hint">暂无称谓</span>')}</div>
+        <div class="kin-chain">${escapeHtml(k.chain)}</div>${k.hint ? `<div class="kin-hint">${escapeHtml(k.hint)}</div>` : ''}</div>`; })()}
+
     <div class="detail-section-title">父母</div>
     <div class="rel-list">${parents.length? parents.map(x=>chip(x)).join('') : '<div class="hint">未记录</div>'}</div>
 
@@ -2186,6 +2244,7 @@ function renderSidePanel(){
       <button class="btn btn-ghost" data-action="add-spouse">+ 配偶</button>
       <button class="btn btn-ghost" data-action="add-child">+ 子女</button>
       ${kids.length>0 ? `<button class="btn btn-ghost" data-action="toggle-collapse">${p.collapsed?'展开下一代':'收起下一代'}</button>` : ''}
+      <button class="btn btn-ghost" data-action="set-viewer">${viewerId===p.id ? '取消「我」视角' : '设为「我」（视角）'}</button>
       <button class="btn btn-ghost" data-action="focus">${focusPersonId===p.id ? '已聚焦 · 点击退出' : '聚焦查看此人'}</button>
     </div>
     <div class="detail-footer">
@@ -2219,6 +2278,7 @@ function renderSidePanel(){
   panel.querySelector('[data-action="focus"]').addEventListener('click', ()=>{
     if(focusPersonId===p.id) exitFocus(); else enterFocus(p.id);
   });
+  panel.querySelector('[data-action="set-viewer"]').addEventListener('click', ()=>setViewer(p.id));
   const collapseBtn = panel.querySelector('[data-action="toggle-collapse"]');
   if(collapseBtn) collapseBtn.addEventListener('click', ()=>toggleCollapse(p.id));
   panel.querySelector('[data-action="add-parent"]').addEventListener('click', ()=>openModal(null, {presetChildOf: p.id, mode:'parent'}));
@@ -2658,6 +2718,7 @@ function validateAndNormalizePeople(rawPeople){
       treeId: importStr(raw.treeId) || undefined,
       hidden: !!raw.hidden,
       collapsed: !!raw.collapsed,
+      parentTypes: (raw.parentTypes && typeof raw.parentTypes==='object' && !Array.isArray(raw.parentTypes)) ? Object.fromEntries(Object.entries(raw.parentTypes).filter(([k,v])=>(v==='step'||v==='adopt')).slice(0,8)) : undefined,
       orderHints: (raw.orderHints && typeof raw.orderHints==='object' && !Array.isArray(raw.orderHints)) ? raw.orderHints : undefined,
     });
   }
