@@ -134,6 +134,10 @@ function blood(P, es){
     const pre=(sx(P[2],1,0)&&sx(P[4],1,0))?'堂':'表';
     return {t:ab(older(last,p1),pre+'伯',pre+'叔'),k:'pcousin'};
   }
+  if(a===3&&b===3){ // 父母的堂/表兄弟姐妹的孩子（同曾祖父母的远房兄弟姐妹）
+    const pre='远房'+((sx(P[1],1,0)&&sx(P[2],1,0)&&sx(P[4],1,0)&&sx(P[5],1,0))?'堂':'表'), o=older(last,me);
+    return {t:sx(last,ab(o,pre+'哥',pre+'弟'),ab(o,pre+'姐',pre+'妹')),k:'rcousin',o};
+  }
   if(a===3&&b===1){
     const g1m=sx(P[1],1,0), g2m=sx(P[2],1,0);
     if(g2m) return {t:sx(last, g1m ? ab(older(last,P[2]),'伯祖父','叔祖父') : ab(older(last,P[2]),'大姥爷','小姥爷'), g1m?'姑奶奶':'姑姥姥'),k:'gsib'};
@@ -164,7 +168,7 @@ function withSpouse(P, es){
     if(r.k==='sib') return (()=>{ const o=older(rel,me); return sx(rel, ab(o,'嫂嫂','弟媳'), ab(o,'姐夫','妹夫')); })();
     if(r.k==='child') return sx(rel,'儿媳','女婿');
     if(r.k==='uncle'||r.k==='pcousin'||r.k==='gsib') { const m=r.t.split('/').map(x=>SPOUSE_OF[x]); return m.every(Boolean) ? m.join('/') : null; }
-    if(r.k==='cousin'){ const pre=r.t[0]; return sx(rel, ab(r.o,pre+'嫂',pre+'弟媳'), ab(r.o,pre+'姐夫',pre+'妹夫')); }
+    if(r.k==='cousin'||r.k==='rcousin'){ const pre=r.k==='rcousin'?r.t.slice(0,3):r.t[0]; return sx(rel, ab(r.o,pre+'嫂',pre+'弟媳'), ab(r.o,pre+'姐夫',pre+'妹夫')); }
     if(r.k==='parent') return sx(rel,'继母','继父');
   }
   return null;
