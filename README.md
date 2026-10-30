@@ -11,6 +11,7 @@ family-tree-app/
 ├── index.html          主应用界面（含 CSP meta 标签），逻辑已拆到 app.js
 ├── kinship.js           亲戚称谓计算（纯函数）
 ├── kintree.js           亲戚图表「树状」视图：布局计算 + 弹窗界面（纯函数部分可在 node 里单测）
+├── tests/               开发用的 node 测试（不影响应用运行，不想发布可整个删掉）：node tests/kinship.test.js、node tests/kintree.test.js
 ├── app.js               应用逻辑（拆分出来是为了让 CSP 能禁用内联脚本，见下方"部署须知"）
 ├── manifest.json        PWA 配置（应用名称、图标、主题色）
 ├── service-worker.js     离线缓存
