@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.21';
+const APP_VERSION = 'v8.22';
 const APP_VERSION_DATE = '2026-10-30';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -748,6 +748,12 @@ function toggleCollapse(id){
   const p = personById(id);
   if(!p) return;
   p.collapsed = !p.collapsed;
+  // 子女只要有一方父母处于收起状态就会被隐藏，所以有共同子女的夫妻一起展开/收起，
+  // 否则（尤其多位配偶时）只点一个"+"看起来像没反应
+  (p.spouses||[]).forEach(sid=>{
+    const s = personById(sid);
+    if(s && people.some(c=>(c.parents||[]).includes(id) && (c.parents||[]).includes(sid))) s.collapsed = p.collapsed;
+  });
   saveData();
   render();
   renderSidePanel();   // panel visibility is governed by panelOpen, so this never pops it open
