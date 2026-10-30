@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.23';
+const APP_VERSION = 'v8.24';
 const APP_VERSION_DATE = '2026-10-30';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2633,8 +2633,30 @@ function focusOn(id){
 }
 
 /* ============ Zoom / Pan ============ */
+/* v8.24: 世代标签（"第 N 代"）原本贴在每一排最左端，画面往右拖后会跑出屏幕；
+   这里让它们始终贴在可视区域左边缘（聚焦时让开左侧快捷按钮） */
+function stickGenLabels(){
+  const canvas = document.getElementById('canvas'), wrapEl = document.getElementById('canvasWrap');
+  if(!canvas || !wrapEl) return;
+  const cr = canvas.getBoundingClientRect(), wr = wrapEl.getBoundingClientRect();
+  let margin = 8;
+  ['quickUp','quickDown'].forEach(id=>{
+    const q = document.getElementById(id);
+    if(q && q.offsetParent!==null) margin = Math.max(margin, q.getBoundingClientRect().right - wr.left + 6);
+  });
+  const visLeft = (wr.left - cr.left) / zoom + margin / zoom;
+  canvas.querySelectorAll('.gen-label').forEach(l=>{
+    const cur = parseFloat(l.dataset.shift || '0');
+    const base = (l.getBoundingClientRect().left - cr.left) / zoom - cur;
+    const shift = Math.max(0, visLeft - base);
+    if(Math.abs(shift-cur) > 0.5){ l.style.transform = `translateX(${shift}px)`; l.dataset.shift = shift; }
+  });
+}
+const _renderBase = render;
+render = function(){ const r = _renderBase.apply(this, arguments); stickGenLabels(); return r; };
 function applyTransform(){
   document.getElementById('canvas').style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
+  stickGenLabels();
   document.getElementById('zoomReset').textContent = Math.round(zoom*100)+'%';
   scheduleSaveViewState();
 }
