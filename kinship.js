@@ -88,8 +88,9 @@ function cmpAge(a,b){
 const older = (a,b)=>{
   const c=cmpAge(a,b);
   if(Number.isNaN(c)){ const e=new Error('conflict'); e.hint='「'+a.name+'」与「'+b.name+'」的排行和出生年份互相矛盾，请检查'; throw e; }
-  return c||need('排行或出生年份');
+  return c;
 };
+const ab = (o,x,y)=> o>0 ? x : o<0 ? y : x+'/'+y;   // 长幼未知时两个都给
 const sx = (p,m,f)=> p.gender==='M'?m : p.gender==='F'?f : need('性别');
 
 /* ---------- 纯血缘段 → {t:称谓, k:类型, o:长幼}；不在表内返回 null ---------- */
@@ -111,16 +112,16 @@ function blood(P, es){
     if(b===2) return {t:(sx(P[1],1,0)?'':'外')+sx(last,'孙子','孙女'),k:'gchild'};
     return null;
   }
-  if(a===1&&b===1){ const o=older(last,me); return {t:sx(last,o>0?'哥哥':'弟弟',o>0?'姐姐':'妹妹'),k:'sib',o}; }
+  if(a===1&&b===1){ const o=older(last,me); return {t:sx(last,ab(o,'哥哥','弟弟'),ab(o,'姐姐','妹妹')),k:'sib',o}; }
   if(a===1&&b===2) return {t:sx(P[2],'侄','外甥')+sx(last,'子','女'),k:'nephew'};
   if(a===2&&b===1){
     const par=P[1];
-    if(sx(par,1,0)){ const t = sx(last, older(last,par)>0?'伯父':'叔叔','姑妈'); return {t,k:'uncle'}; }
+    if(sx(par,1,0)){ const t = sx(last, ab(older(last,par),'伯父','叔叔'),'姑妈'); return {t,k:'uncle'}; }
     return {t:sx(last,'舅舅','姨妈'),k:'uncle'};
   }
   if(a===2&&b===2){
     const pre = (sx(P[1],1,0) && sx(P[3],1,0)) ? '堂':'表', o=older(last,me);
-    return {t:pre+sx(last,o>0?'哥':'弟',o>0?'姐':'妹'),k:'cousin',o};
+    return {t:sx(last,ab(o,pre+'哥',pre+'弟'),ab(o,pre+'姐',pre+'妹')),k:'cousin',o};
   }
   if(a===2&&b===3){
     const pre = (sx(P[1],1,0) && sx(P[3],1,0)) ? '堂':'表';
@@ -131,11 +132,11 @@ function blood(P, es){
     if(!sx(last,1,0)) return {t:paternal?'表姑妈':'表姨妈',k:'pcousin'};
     if(!paternal) return {t:'表舅',k:'pcousin'};
     const pre=(sx(P[2],1,0)&&sx(P[4],1,0))?'堂':'表';
-    return {t:pre+(older(last,p1)>0?'伯':'叔'),k:'pcousin'};
+    return {t:ab(older(last,p1),pre+'伯',pre+'叔'),k:'pcousin'};
   }
   if(a===3&&b===1){
     const g1m=sx(P[1],1,0), g2m=sx(P[2],1,0);
-    if(g2m) return {t:sx(last, g1m ? (older(last,P[2])>0?'伯祖父':'叔祖父') : (older(last,P[2])>0?'大姥爷':'小姥爷'), g1m?'姑奶奶':'姑姥姥'),k:'gsib'};
+    if(g2m) return {t:sx(last, g1m ? ab(older(last,P[2]),'伯祖父','叔祖父') : ab(older(last,P[2]),'大姥爷','小姥爷'), g1m?'姑奶奶':'姑姥姥'),k:'gsib'};
     return {t:sx(last, g1m?'舅爷':'舅姥爷', g1m?'姨奶奶':'姨姥姥'),k:'gsib'};
   }
   return null;
@@ -154,16 +155,16 @@ function withSpouse(P, es){
     const r=blood(P.slice(1), es.slice(1)); if(!r) return null;
     const m = sx(me,1,0);
     if(r.k==='parent') return sx(last, m?'岳父':'公公', m?'岳母':'婆婆');
-    if(r.k==='sib') return sx(last, m?(r.o>0?'大舅子':'小舅子'):(r.o>0?'大伯子':'小叔子'), m?(r.o>0?'大姨子':'小姨子'):(r.o>0?'大姑子':'小姑子'));
+    if(r.k==='sib') return sx(last, m?ab(r.o,'大舅子','小舅子'):ab(r.o,'大伯子','小叔子'), m?ab(r.o,'大姨子','小姨子'):ab(r.o,'大姑子','小姑子'));
     if(r.k==='child') return sx(last,'继子','继女');
     return null;
   }
   if(i===es.length-1){ // 血亲的配偶
     const rel=P[P.length-2], r=blood(P.slice(0,-1), es.slice(0,-1)); if(!r) return null;
-    if(r.k==='sib') return sx(rel, older(rel,me)>0?'嫂嫂':'弟媳', older(rel,me)>0?'姐夫':'妹夫');
+    if(r.k==='sib') return (()=>{ const o=older(rel,me); return sx(rel, ab(o,'嫂嫂','弟媳'), ab(o,'姐夫','妹夫')); })();
     if(r.k==='child') return sx(rel,'儿媳','女婿');
-    if(r.k==='uncle'||r.k==='pcousin'||r.k==='gsib') return SPOUSE_OF[r.t]||null;
-    if(r.k==='cousin'){ const pre=r.t[0]; return sx(rel, pre+(r.o>0?'嫂':'弟媳'), pre+(r.o>0?'姐夫':'妹夫')); }
+    if(r.k==='uncle'||r.k==='pcousin'||r.k==='gsib') { const m=r.t.split('/').map(x=>SPOUSE_OF[x]); return m.every(Boolean) ? m.join('/') : null; }
+    if(r.k==='cousin'){ const pre=r.t[0]; return sx(rel, ab(r.o,pre+'嫂',pre+'弟媳'), ab(r.o,pre+'姐夫',pre+'妹夫')); }
     if(r.k==='parent') return sx(rel,'继母','继父');
   }
   return null;
@@ -205,7 +206,7 @@ function compute(people, meId){
     try{
       const nS = es.filter(e=>e==='S').length;
       let t = nS===0 ? (blood(P,es)||{}).t : nS===1 ? withSpouse(P,es) : nS===2 ? withTwoSpouses(P,es) : null;
-      if(t){ info.title = t + (c.nb ? '（继/养）' : ''); }
+      if(t){ info.title = t + (c.nb ? '（继/养）' : ''); if(t.includes('/')) info.hint = '补充排行或出生年份后可确定具体称谓'; }
       else info.hint = '关系较远，暂无标准称谓';
     }catch(e){
       if(e.need) info.hint = '补充'+e.need+'后可显示称谓'; else if(e.hint) info.hint = e.hint; else throw e;
