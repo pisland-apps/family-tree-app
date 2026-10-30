@@ -29,39 +29,49 @@ function detectCycles(people){
   return found;
 }
 
-/* ---------- 路径搜索：按层 BFS；同长度时 姻缘边少 > 非亲生边少 > id 小 ---------- */
+/* ---------- 路径搜索 ----------
+   血缘段只允许"先上后下"（U*D*），不走折线，否则经由半血亲/多重父母会抢走标准路径；
+   每遇配偶边重新开始一段。同长度时 姻缘边少 > 非亲生边少 > id 小。 */
 function search(people, meId){
   const byId = new Map(people.map(p=>[p.id,p])), kids = new Map();
   people.forEach(p=>(p.parents||[]).forEach(pid=>{ if(byId.has(pid)){ if(!kids.has(pid)) kids.set(pid,[]); kids.get(pid).push(p.id); } }));
   const nonbio = (child, parent)=> ((byId.get(child).parentTypes||{})[parent]) ? 1 : 0;
-  const best = new Map([[meId,{len:0,sp:0,nb:0,prev:null,e:null}]]);
-  let layer = [meId];
+  const key = (id,ph)=>id+'|'+ph;
+  const k0 = key(meId,'u');
+  const best = new Map([[k0,{id:meId,len:0,sp:0,nb:0,prev:null,e:null}]]);
+  let layer = [k0];
   while(layer.length){
     const cand = new Map();
-    for(const x of layer){
-      const bx = best.get(x);
-      if(bx.len - bx.sp >= MAX_BLOOD) { /* 血缘步数用尽，只允许再走配偶边 */ }
+    for(const kx of layer){
+      const bx = best.get(kx), x = bx.id, ph = kx.slice(kx.lastIndexOf('|')+1), px = byId.get(x);
       const nbrs = [];
-      (byId.get(x).parents||[]).forEach(y=>{ if(byId.has(y)) nbrs.push([y,'U',nonbio(x,y)]); });
-      (kids.get(x)||[]).forEach(y=>nbrs.push([y,'D',nonbio(y,x)]));
-      (byId.get(x).spouses||[]).forEach(y=>{ if(byId.has(y)) nbrs.push([y,'S',0]); });
-      for(const [y,e,n] of nbrs){
-        if(best.has(y)) continue;
+      if(ph==='u') (px.parents||[]).forEach(y=>{ if(byId.has(y)) nbrs.push([y,'U',nonbio(x,y),'u']); });
+      (kids.get(x)||[]).forEach(y=>nbrs.push([y,'D',nonbio(y,x),'d']));
+      (px.spouses||[]).forEach(y=>{ if(byId.has(y)) nbrs.push([y,'S',0,'u']); });
+      for(const [y,e,n,nph] of nbrs){
+        const ky = key(y,nph);
+        if(best.has(ky)) continue;
         const sp = bx.sp + (e==='S'?1:0), len = bx.len+1;
         if(sp>MAX_SPOUSE || len-sp>MAX_BLOOD) continue;
-        const c = {len,sp,nb:bx.nb+n,prev:x,e};
-        const old = cand.get(y);
-        if(!old || c.sp<old.sp || (c.sp===old.sp && (c.nb<old.nb || (c.nb===old.nb && x<old.prev)))) cand.set(y,c);
+        const c = {id:y,len,sp,nb:bx.nb+n,prev:kx,e};
+        const old = cand.get(ky);
+        if(!old || c.sp<old.sp || (c.sp===old.sp && (c.nb<old.nb || (c.nb===old.nb && kx<old.prev)))) cand.set(ky,c);
       }
     }
     layer = [];
-    cand.forEach((c,y)=>{ best.set(y,c); layer.push(y); });
+    cand.forEach((c,ky)=>{ best.set(ky,c); layer.push(ky); });
   }
-  return {byId, best};
+  // 每个人取最优状态
+  const pick = new Map();
+  best.forEach((c,ky)=>{
+    const o = pick.get(c.id);
+    if(!o || c.len<o.c.len || (c.len===o.c.len && (c.sp<o.c.sp || (c.sp===o.c.sp && (c.nb<o.c.nb || (c.nb===o.c.nb && ky<o.ky)))))) pick.set(c.id,{ky,c});
+  });
+  return {byId, best, pick};
 }
-function pathTo(best, id){
-  const ns=[id], es=[]; let c=best.get(id);
-  while(c && c.prev!==null){ ns.unshift(c.prev); es.unshift(c.e); c=best.get(c.prev); }
+function pathTo(best, ky){
+  const ns=[], es=[]; let c=best.get(ky);
+  while(c){ ns.unshift(c.id); if(c.prev===null) break; es.unshift(c.e); c=best.get(c.prev); }
   return {ns, es};
 }
 
@@ -167,14 +177,14 @@ function chainText(P, es){
 function compute(people, meId){
   const result = new Map();
   if(!people.some(p=>p.id===meId)) return result;
-  const {byId,best} = search(people, meId);
-  best.forEach((c,id)=>{
-    const {ns,es} = pathTo(best,id), P = ns.map(x=>byId.get(x));
+  const {byId,best,pick} = search(people, meId);
+  pick.forEach(({ky,c},id)=>{
+    const {ns,es} = pathTo(best,ky), P = ns.map(x=>byId.get(x));
     const info = {title:null, chain:chainText(P,es), hint:''};
     try{
       const nS = es.filter(e=>e==='S').length;
       let t = nS===0 ? (blood(P,es)||{}).t : nS===1 ? withSpouse(P,es) : null;
-      if(t){ info.title = t + (best.get(id).nb ? '（继/养）' : ''); }
+      if(t){ info.title = t + (c.nb ? '（继/养）' : ''); }
       else info.hint = '关系较远，暂无标准称谓';
     }catch(e){
       if(e.need) info.hint = '补充'+e.need+'后可显示称谓'; else if(e.hint) info.hint = e.hint; else throw e;
