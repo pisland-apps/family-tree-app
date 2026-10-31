@@ -21,7 +21,6 @@ const APP_SHELL = [
   './kinship.js',
   './kintree.js',
   './paizi.js',
-  './paizi-ref.html',
   './paizi-ref.js',
   './html2canvas.min.js',
   './manifest.json',

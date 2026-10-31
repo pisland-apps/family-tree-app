@@ -3281,7 +3281,7 @@ document.getElementById('treeSelect').addEventListener('change', (e)=>switchTree
   }
   const close = ()=>ov.classList.remove('show');
   $('paiziOpenBtn').addEventListener('click', openPaizi);
-  $('paiziRefBtn').addEventListener('click', ()=>{ window.open('paizi-ref.html', '_blank'); });
+  $('paiziRefBtn').addEventListener('click', ()=>{ window.openLinRef(); });
   $('paiziClose').addEventListener('click', close); $('paiziCancel').addEventListener('click', close);
   ov.addEventListener('click', e=>{ if(e.target===ov) close(); });
   $('paiziSeq').addEventListener('input', ()=>refreshShi()); $('paiziStart1').addEventListener('input', ()=>refreshShi());
