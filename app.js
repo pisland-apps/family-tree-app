@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.37';
+const APP_VERSION = 'v8.38';
 const APP_VERSION_DATE = '2026-10-31';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2348,7 +2348,7 @@ function paiziBoxHtml(p){
   if(!d || !d.line) return '';   // 只对父系显示
   const nums = escapeHtml(cfg.sys1) + '第 ' + d.shi + ' 世' + ((d.ru!=null && d.ru>=1) ? ' · ' + escapeHtml(cfg.sys2) + '第 ' + d.ru + ' 世' : '');
   const main = d.chars
-    ? '派字「<b>' + d.chars.map(escapeHtml).join(' / ') + '</b>」' + (d.hit ? ' ✓' : ' <span class="pz-miss">（名字里没有）</span>')
+    ? '派字「<b>' + d.chars.map(escapeHtml).join(' / ') + '</b>」' + (d.hit ? (d.chars.indexOf(d.found)>=0 ? ' ✓' : ' ✓ <span class="pz-miss">（名字用「' + escapeHtml(d.found) + '」）</span>') : ' <span class="pz-miss">（名字里没有）</span>')
     : '<span class="pz-miss">字谱里没有这一世</span>';
   return '<div class="paizi-box">' + main + '<div class="pz-sub">' + nums + '</div></div>';
 }

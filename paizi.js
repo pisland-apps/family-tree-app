@@ -36,6 +36,19 @@ const PRESETS = [
    seq:["超", "兴", "桂", "明", "道", "立", "德", "举", "善", "进", "良", "显", "宗", "华"]}
 ];
 
+/* 异体 / 通用字：取名时常用的写法和字谱不一样（字谱写「方」，实际取名用「坊」；字谱写「升」，大多数人用「昇」）。
+   每一组里的字互相视为同一个字，只用在「名字里有没有派字」的比对上，不改字谱本身。
+   后半是常见的简繁对应（字谱按简体存，名字多半是繁体），只收字谱里会出现的字。 */
+const VARIANT_GROUPS = [
+  '方坊', '升昇陞', '熙熈煕', '启啓啟', '运運', '扬揚', '传傳', '继繼', '绪緒', '孙孫', '骏駿', '业業', '国國', '礼禮', '鲁魯',
+  '书書', '诗詩', '贻貽', '禄祿', '义義', '勋勳', '泽澤', '赞贊', '绍紹', '声聲', '时時', '学學', '开開', '华華', '鸿鴻',
+  '师師', '觉覺', '钦欽', '会會', '兰蘭', '腾騰', '长長', '风風', '兴興', '经經', '显顯', '进進', '举舉', '后後',
+].filter(Boolean);
+const VARIANT_OF = new Map();
+VARIANT_GROUPS.forEach(g=>{ const cs = Array.from(g); cs.forEach(c=>VARIANT_OF.set(c, cs)); });
+const variantsOf = c => VARIANT_OF.get(c) || [c];
+const sameChar = (a,b) => a===b || variantsOf(a).indexOf(b)>=0;
+
 const isChar = s => typeof s==='string' && Array.from(s).length===1;
 const isInt = (n,a,b) => Number.isInteger(n) && n>=a && n<=b;
 
@@ -124,9 +137,12 @@ function describe(person, cfg, map){
   const chars = charsAt(cfg, r.shi);
   const ru = (cfg.start2!=null) ? r.shi - cfg.start1 + cfg.start2 : null;
   const name = String(person.name||'');
-  return {shi: r.shi, ru, chars, line: r.line, hit: (chars && name) ? chars.some(c=>name.indexOf(c)>=0) : null};
+  // 名字里出现的字 = 派字本身或它的异体；found 是名字里实际用的那个字（和派字不同时界面上会标出来）
+  let found = null;
+  if(chars && name) for(const c of chars){ const v = variantsOf(c).find(x=>name.indexOf(x)>=0); if(v){ found = v; break; } }
+  return {shi: r.shi, ru, chars, line: r.line, hit: (chars && name) ? !!found : null, found};
 }
 
-const api = {PRESETS, PRESET_BAIYAN, parseSeq, sanitize, charsAt, shiList, compute, describe};
+const api = {PRESETS, PRESET_BAIYAN, parseSeq, sanitize, charsAt, shiList, compute, describe, variantsOf, sameChar};
 if(typeof module!=='undefined' && module.exports) module.exports = api; else root.Paizi = api;
 })(typeof window!=='undefined' ? window : globalThis);

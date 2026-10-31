@@ -51,4 +51,10 @@ eq(P.charsAt(pr('xixi'),141), ['宗'], '溪西 141 宗'); eq(P.charsAt(pr('xixi'
 eq(P.charsAt(pr('yu'),122), ['赞'], '裕公 24 世 = 坚公 122'); eq(P.charsAt(pr('xiaoshan'),143), ['名'], '肖山公第 20 世「名」= 坚公 143'); eq(P.charsAt(pr('qichang'),138), ['华'], '奇昌公第 15 世「华」= 坚公 138');
 eq(P.PRESETS.find(p=>p.id==='xiaoshan').seq.length, 19, '肖山 2–20 世共 19 代'); eq(P.PRESETS.find(p=>p.id==='guanding').seq.length, 24, '观定 24 代');
 eq(P.charsAt(cfg0,125), ['运'], '125 世「运」（口传记作远，字形与词义指向运）');
+// 7. 异体字：方=坊、升=昇=陞；简繁；字谱本身不变
+eq(P.sameChar('方','坊'), true, '方=坊'); eq(P.sameChar('升','昇'), true, '升=昇'); eq(P.sameChar('方','芳'), false, '方≠芳');
+const V = [mk('g','林廷','M'), mk('f','林日','M',{parents:['g']}), mk('m','林緯坊','M',{parents:['f']}), mk('s','林昇宏','M',{parents:['m']}), mk('s2','林緯宏','M',{parents:['m']}), mk('t','林運','M',{parents:['g']})];
+const cv = P.sanitize(Object.assign({}, P.PRESET_BAIYAN, {anchorId:'m', anchorShi:134})); const mv = P.compute(V, cv); const dv = id=>P.describe(V.find(p=>p.id===id), cv, mv);
+eq([dv('m').hit, dv('m').found], [true,'坊'], '坊 命中 方'); eq([dv('s').hit, dv('s').found], [true,'昇'], '昇 命中 升'); eq(dv('s2').hit, false, '没有派字仍提示');
+eq(P.sameChar('运','運'), true, '繁体「運」=「运」'); eq(P.charsAt(cv,134), ['方'], '字谱本身不被改动');
 console.log(bad ? '失败 '+bad : '全部通过'); process.exitCode = bad ? 1 : 0;

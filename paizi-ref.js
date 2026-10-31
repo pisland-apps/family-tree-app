@@ -22,7 +22,7 @@ function q(){
  const id=$('pai').value,c=$('ch').value.trim(),s=parseInt($('shi').value,10),r=$('res');
  if(!id){r.textContent='请先选择派别。';return}
  const p=by[id];let hits=[];
- if(c){p.seq.forEach((a,k)=>{if(a.split('|').includes(c))hits.push(p.start1+k)});
+ if(c){p.seq.forEach((a,k)=>{if(a.split('|').some(x=>window.Paizi?window.Paizi.sameChar(x,c):x===c))hits.push(p.start1+k)});
   if(!hits.length){r.textContent=`「${c}」不在${p.label}的字序里(可能是个人名字,或属于别的派)。`;return}
   r.innerHTML=hits.map(h=>`「${c}」= ${p.label} <b>坚公第 ${h} 世</b> · ${p.sys2}第 ${h-p.start1+p.start2} 世${p.sys2==='入琼'?'':' · 入琼第 '+(h-104)+' 世'}`).join('<br>')}
  else if(s){const a=alt(p,s);if(!a){r.textContent=`${p.label}的字序没有坚公第 ${s} 世。`;return}hits=[s];
