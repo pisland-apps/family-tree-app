@@ -3,7 +3,7 @@
    称谓表目前只有普通话"背称"，集中在 blood()/spouseTitle() 两处，方言可替换这两处的字符串。 */
 (function(root){
 'use strict';
-const MAX_BLOOD = 6, MAX_SPOUSE = 2;
+const MAX_BLOOD = 16, MAX_SPOUSE = 2;
 
 function need(what){ const e = new Error(what); e.need = what; throw e; }
 
@@ -99,6 +99,45 @@ const older = (a,b)=>{
 const ab = (o,x,y)=> o>0 ? x : o<0 ? y : x+'/'+y;   // 长幼未知时两个都给
 const sx = (p,m,f)=> p.gender==='M'?m : p.gender==='F'?f : need('性别');
 
+/* ---------- v8.48: 通用生成器 + 兜底 ----------
+   手写表之外的血缘关系（共同祖先在上 a 代、我这边往下 b 代）：
+   · 同辈/晚辈（b>=a）：远房堂/表 + 哥弟姐妹 / 侄·外甥 + 子孙曾孙玄孙来孙昆孙仍孙云孙耳孙
+   · 长辈（a-b 为 1 或 2，b>=2）：远房堂/表 伯叔姑 / 伯祖叔祖祖姑
+   · 其余没有通行叫法：给"远亲（共同祖先在上 a 代，下 b 代）"，不留空白，也不乱编称谓。 */
+const DESC=['','','孙','曾孙','玄孙','来孙','昆孙','仍孙','云孙','耳孙'];
+function generic(P,a,b){
+  const last=P[P.length-1], far={t:'远亲（共同祖先在上'+a+'代，下'+b+'代）',k:'far'};
+  if(!a||!b) return null;
+  const allM = arr=>arr.every(x=>sx(x,1,0));
+  const rf = a>=3?'远房':'', lineage = a>=4 ? '（同'+(a===4?'高祖':'上'+a+'代祖')+'）' : '';
+  const e=b-a;
+  if(e>=0){
+    const cousin=P[2*a];
+    const pre = allM(P.slice(1,a).concat(P.slice(a+1,2*a))) ? '堂':'表';
+    if(e===0){
+      const o=older(last,P[0]), pf=rf+pre;
+      return {t:sx(last,ab(o,pf+'哥',pf+'弟'),ab(o,pf+'姐',pf+'妹'))+lineage,k:'rcousin',o};
+    }
+    if(e>9) return far;
+    const base=sx(cousin,'侄','外甥');
+    const body = e===1 ? base+sx(last,'子','女') : base+DESC[e]+sx(last,'','女');
+    return {t:rf+(a>=2?pre:'')+body+lineage,k:a===1?'nephewN':'cn'};
+  }
+  const d=a-b;
+  if(b>=2 && (d===1||d===2)){
+    const pf=rf+(allM(P.slice(1,a).concat(P.slice(a+1,a+b)))?'堂':'表');
+    if(d===1){
+      const paternal=sx(P[1],1,0);
+      if(!sx(last,1,0)) return {t:rf+(paternal?'表姑妈':'表姨妈')+lineage,k:'rpcousin'};
+      if(!paternal) return {t:rf+'表舅'+lineage,k:'rpcousin'};
+      return {t:ab(older(last,P[1]),pf+'伯',pf+'叔')+lineage,k:'rpcousin'};
+    }
+    if(!sx(last,1,0)) return {t:pf+'祖姑'+lineage,k:'rpcousin'};
+    return {t:ab(older(last,P[2]),pf+'伯祖',pf+'叔祖')+lineage,k:'rpcousin'};
+  }
+  return far;
+}
+
 /* ---------- 纯血缘段 → {t:称谓, k:类型, o:长幼}；不在表内返回 null ---------- */
 function blood(P, es){
   let a=0; while(a<es.length && es[a]==='U') a++;
@@ -108,8 +147,7 @@ function blood(P, es){
   if(!a && !b) return {t:'我',k:'self'};
   if(!b){
     const n=[['父亲','母亲'],['祖父','祖母'],['曾祖父','曾祖母'],['高祖父','高祖母']];
-    if(a>4) return null;
-    let t = sx(last,n[a-1][0],n[a-1][1]);
+    let t = a>4 ? sx(last,'远祖父','远祖母') : sx(last,n[a-1][0],n[a-1][1]);   // v8.48: 上 5 代起统称远祖
     if(a>=2 && sx(P[1],0,1)) t='外'+t;
     return {t,k:a===1?'parent':'anc'};
   }
@@ -118,12 +156,13 @@ function blood(P, es){
     if(b===2) return {t:(sx(P[1],1,0)?'':'外')+sx(last,'孙子','孙女'),k:'gchild'};
     if(b===3) return {t:((sx(P[1],1,0)&&sx(P[2],1,0))?'':'外')+sx(last,'曾孙','曾孙女'),k:'ggchild'};
     if(b===4) return {t:((sx(P[1],1,0)&&sx(P[2],1,0)&&sx(P[3],1,0))?'':'外')+sx(last,'玄孙','玄孙女'),k:'ggchild'};
-    return null;
+    // v8.48: 来孙、昆孙、仍孙、云孙、耳孙（下 5～9 代），更远统称远孙
+    const ext = P.slice(1,b).every(x=>sx(x,1,0)) ? '' : '外', nm = b<=9 ? DESC[b] : '远孙';
+    return {t:ext+sx(last,nm,nm+'女'),k:'ggchild'};
   }
   if(a===1&&b===1){ const o=older(last,me); return {t:sx(last,ab(o,'哥哥','弟弟'),ab(o,'姐姐','妹妹')),k:'sib',o}; }
   if(a===1&&b===2) return {t:sx(P[2],'侄','外甥')+sx(last,'子','女'),k:'nephew'};
   if(a===1&&b===3) return {t:sx(P[2],'侄孙','外甥孙')+sx(last,'','女'),k:'nephew2'};
-  if(a===1&&b===4) return {t:sx(P[2],'侄曾孙','外甥曾孙')+sx(last,'','女'),k:'nephew3'};
   if(a===2&&b===1){
     const par=P[1];
     if(sx(par,1,0)){ const t = sx(last, ab(older(last,par),'伯父','叔叔'),'姑妈'); return {t,k:'uncle'}; }
@@ -136,10 +175,6 @@ function blood(P, es){
   if(a===2&&b===3){
     const pre = (sx(P[1],1,0) && sx(P[3],1,0)) ? '堂':'表';
     return {t:pre+sx(P[4],'侄','外甥')+sx(last,'子','女'),k:'cn'};
-  }
-  if(a===2&&b===4){ // 堂/表侄、外甥的孙辈：堂侄孙/堂外甥孙（女：…孙女）
-    const pre = (sx(P[1],1,0) && sx(P[3],1,0)) ? '堂':'表';
-    return {t:pre+sx(P[4],'侄孙','外甥孙')+sx(last,'','女'),k:'cn2'};
   }
   if(a===3&&b===2){ // 祖辈兄弟姐妹的子女：堂/表伯叔、表姑妈、表舅、表姨妈
     const p1=P[1], paternal=sx(p1,1,0);
@@ -165,7 +200,7 @@ function blood(P, es){
     const pre=(sx(P[1],1,0)&&sx(P[2],1,0)&&sx(P[3],1,0)&&sx(P[5],1,0))?'堂':'表';
     return {t:sx(last, ab(older(last,P[2]),pre+'伯祖',pre+'叔祖'), pre+'祖姑'),k:'pcousin'};
   }
-  return null;
+  return generic(P,a,b);
 }
 const SPOUSE_OF = {'伯父':'伯母','叔叔':'婶婶','舅舅':'舅妈','姑妈':'姑丈','姨妈':'姨丈',
   '堂伯':'堂伯母','堂叔':'堂婶','表伯':'表伯母','表叔':'表婶','表姑妈':'表姑丈','表舅':'表舅妈','表姨妈':'表姨丈',
