@@ -123,6 +123,7 @@ function blood(P, es){
   if(a===1&&b===1){ const o=older(last,me); return {t:sx(last,ab(o,'哥哥','弟弟'),ab(o,'姐姐','妹妹')),k:'sib',o}; }
   if(a===1&&b===2) return {t:sx(P[2],'侄','外甥')+sx(last,'子','女'),k:'nephew'};
   if(a===1&&b===3) return {t:sx(P[2],'侄孙','外甥孙')+sx(last,'','女'),k:'nephew2'};
+  if(a===1&&b===4) return {t:sx(P[2],'侄曾孙','外甥曾孙')+sx(last,'','女'),k:'nephew3'};
   if(a===2&&b===1){
     const par=P[1];
     if(sx(par,1,0)){ const t = sx(last, ab(older(last,par),'伯父','叔叔'),'姑妈'); return {t,k:'uncle'}; }
@@ -135,6 +136,10 @@ function blood(P, es){
   if(a===2&&b===3){
     const pre = (sx(P[1],1,0) && sx(P[3],1,0)) ? '堂':'表';
     return {t:pre+sx(P[4],'侄','外甥')+sx(last,'子','女'),k:'cn'};
+  }
+  if(a===2&&b===4){ // 堂/表侄、外甥的孙辈：堂侄孙/堂外甥孙（女：…孙女）
+    const pre = (sx(P[1],1,0) && sx(P[3],1,0)) ? '堂':'表';
+    return {t:pre+sx(P[4],'侄孙','外甥孙')+sx(last,'','女'),k:'cn2'};
   }
   if(a===3&&b===2){ // 祖辈兄弟姐妹的子女：堂/表伯叔、表姑妈、表舅、表姨妈
     const p1=P[1], paternal=sx(p1,1,0);
