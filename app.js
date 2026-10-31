@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.41';
+const APP_VERSION = 'v8.42';
 const APP_VERSION_DATE = '2026-10-31';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -3353,10 +3353,10 @@ document.getElementById('treeSelect').addEventListener('change', (e)=>switchTree
     });
     if(selShi!=null && byShi.has(selShi)){
       const chars = Paizi.charsAt(cfg, selShi) || [];
-      list.innerHTML = '<h4>' + escapeHtml(cfg.sys1) + ' 第 ' + selShi + ' 世 · 派字「' + chars.map(escapeHtml).join(' / ') + '」</h4>';
+      list.innerHTML = '<h4>' + escapeHtml(cfg.sys1) + ' 第 ' + selShi + ' 世 · 派字「' + chars.map(escapeHtml).join(' / ') + '」<span style="font-weight:400; font-size:12px; color:#8a7a68;">　虚线 = 名字里没有派字</span></h4>';
       byShi.get(selShi).forEach(({p, d})=>{
         const x = document.createElement('button'); x.type = 'button';
-        x.className = d.hit ? '' : 'miss'; x.textContent = p.name + (d.hit ? '' : '（名字里没有）');
+        x.className = d.hit ? '' : 'miss'; x.textContent = p.name;
         x.addEventListener('click', ()=>{ ov.classList.remove('show'); enterFocus(p.id); });
         list.appendChild(x);
       });
