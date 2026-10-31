@@ -656,8 +656,19 @@ svg.connectors{
 .toast.show{opacity:1; transform:translateX(-50%) translateY(-4px);}
 input[type=file]{font-size:12px;}
 
+@keyframes sheetUp{from{transform:translateY(100%);} to{transform:none;}}
 @media (max-width:720px){
-  .side-panel{position:fixed; right:0; top:64px; bottom:0; z-index:40; box-shadow:-8px 0 24px rgba(0,0,0,0.15);}
+  /* v8.28: 手机上详情改成底部抽屉（从屏幕底部升起，不再占掉右侧一大块；平板 / 电脑不变） */
+  .side-panel{
+    position:fixed; left:0; right:0; top:auto; bottom:0; width:auto; z-index:65;   /* 比视角条（60）高，抽屉开着时盖住它 */
+    max-height:58vh; max-height:58dvh;
+    border-left:0; border-top:1px solid var(--card-border); border-radius:16px 16px 0 0;
+    padding:10px 18px calc(22px + env(safe-area-inset-bottom));
+    box-shadow:0 -8px 24px rgba(0,0,0,0.18);
+    overscroll-behavior:contain; touch-action:pan-y;
+    animation:sheetUp .22s ease-out;
+  }
+  .side-panel::before{content:''; display:block; width:42px; height:5px; border-radius:3px; background:#d9cdb5; margin:0 auto 14px;}   /* 拖动条：往下划关闭 */
   .brand .name{font-size:16px;}
   .brand .sub{display:none;}
   .search-wrap{max-width:none;}

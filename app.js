@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.27';
+const APP_VERSION = 'v8.28';
 const APP_VERSION_DATE = '2026-10-31';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -1616,6 +1616,7 @@ function pulseCard(id){
     setTimeout(()=>el.classList.remove('focus-pulse'), 2600);
   }, 200);
 }
+function isPhoneLayout(){ return window.matchMedia('(max-width:720px)').matches; }   // 和 index.html 里手机那组 CSS 的断点一致
 function centerOnPerson(id, afterRender){
   const run = ()=>{
     const wrap = document.getElementById('canvasWrap');
@@ -1626,7 +1627,11 @@ function centerOnPerson(id, afterRender){
     const elCenterX = elRect.left + elRect.width/2;
     const elCenterY = elRect.top + elRect.height/2;
     const wrapCenterX = wrapRect.left + wrapRect.width/2;
-    const wrapCenterY = wrapRect.top + wrapRect.height/2;
+    // v8.28: 手机上详情是底部抽屉，居中要对着抽屉上面那块可见区域，不然人会被抽屉盖住
+    const sheet = document.getElementById('sidePanel');
+    const sheetOpen = isPhoneLayout() && sheet && !sheet.classList.contains('hidden');
+    const visibleBottom = sheetOpen ? Math.max(wrapRect.top + 120, Math.min(wrapRect.bottom, window.innerHeight - sheet.offsetHeight)) : wrapRect.bottom;
+    const wrapCenterY = wrapRect.top + (visibleBottom - wrapRect.top)/2;
     // pan is a plain screen-pixel offset (applied outside the canvas's own
     // scale), so a plain screen-pixel delta can be added directly here.
     pan.x += (wrapCenterX - elCenterX);
@@ -2301,7 +2306,32 @@ function selectPerson(id){
   render();
   renderSidePanel();
   recordNavState();
+  if(isPhoneLayout()) centerOnPerson(id, true);   // v8.28: 抽屉升起后，让这个人出现在抽屉上方
 }
+
+/* v8.28: 手机上详情抽屉——在抽屉上往下划关闭（只在内容滚到最上面时才算，不抢滚动） */
+(function(){
+  const panel = document.getElementById('sidePanel');
+  if(!panel) return;
+  let startY = null, dy = 0;
+  panel.addEventListener('touchstart', e=>{
+    startY = (isPhoneLayout() && panel.scrollTop<=0 && e.touches.length===1) ? e.touches[0].clientY : null; dy = 0;
+    panel.style.transition = 'none';
+  }, {passive:true});
+  panel.addEventListener('touchmove', e=>{
+    if(startY===null) return;
+    dy = e.touches[0].clientY - startY;
+    if(dy>0) panel.style.transform = `translateY(${dy}px)`; else { panel.style.transform = ''; }
+  }, {passive:true});
+  const end = ()=>{
+    if(startY===null) return;
+    const close = dy>90; startY = null;
+    panel.style.transition = 'transform .18s ease'; panel.style.transform = '';
+    if(close){ const b = document.getElementById('panelCloseBtn'); if(b) b.click(); }
+  };
+  panel.addEventListener('touchend', end, {passive:true});
+  panel.addEventListener('touchcancel', end, {passive:true});
+})();
 
 function renderSidePanel(){
   const panel = document.getElementById('sidePanel');
