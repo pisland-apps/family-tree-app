@@ -23,7 +23,7 @@ function layout(people, kinMap, viewerId, opts){
   opts = opts || {};
   const CW = opts.cardW || 124, CH = opts.cardH || 46, CGAP = 6, ROW = CH + CGAP;
   const PILL_W = 66, PILL_H = 28, PADY = 10;
-  const PADL = 30, PADR = 24, HEAD_H = 58, BAND_GAP = 20;
+  const PADL = 30, PADR = 24, HEAD_H = 72, BAND_GAP = 20;
   const GAP_BASE = 30, SLOT_W = 8;
   const THRESH = opts.collapseOver || 6;
   const expanded = opts.expanded || new Set();
@@ -244,7 +244,7 @@ function layout(people, kinMap, viewerId, opts){
     }
   }));
 
-  const heads = gens.map((g,i)=>({x:colX[i], w:CW, text:genLabel(g)}));
+  const heads = gens.map((g,i)=>({x:colX[i], w:CW, text:genLabel(g), gen:g}));
   return {nodes, pills, links, heads, bands:bandBoxes, width, height, skipped, shown:nodes.length};
 }
 
@@ -257,7 +257,10 @@ function renderHtml(L, ctx){
   L.links.forEach(l=>parts.push(`<path class="kt-${l.cls}" d="${l.d}"/>`));
   parts.push('</svg>');
   parts.push(`<div class="kt-title"><b>亲戚称呼图表</b><span>${esc(ctx.subtitle||'')}</span></div>`);
-  L.heads.forEach(h=>parts.push(`<div class="kt-head" style="left:${h.x}px;width:${h.w}px">${esc(h.text)}</div>`));
+  L.heads.forEach(h=>{
+    const note = ctx.headNote ? ctx.headNote(h.gen) : '';   // 例如派字：「父系·方·134世」
+    parts.push(`<div class="kt-head" style="left:${h.x}px;width:${h.w}px">${esc(h.text)}${note?`<small>${esc(note)}</small>`:''}</div>`);
+  });
   L.bands.forEach(b=>parts.push(`<div class="kt-band" style="top:${b.y}px;height:${b.h}px">${Array.from(b.label).map(c=>`<i>${esc(c)}</i>`).join('')}</div>`));
   L.nodes.forEach(n=>{
     const p = ctx.personById(n.id); if(!p) return;

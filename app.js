@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.28';
+const APP_VERSION = 'v8.29';
 const APP_VERSION_DATE = '2026-10-31';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -1052,7 +1052,13 @@ function openKinChart(){
   KinTree.show(ov, {
     state: ()=>({people, kinMap, viewerId, viewerName: personById(viewerId).name, dname: (Kinship.DIALECTS[kinDialect]||{}).name || '普通话'}),
     gridHtml: kinGridHtml,
-    ctx: {escapeHtml, personById, photoSrc, surnameChar, isDeceased},
+    ctx: {escapeHtml, personById, photoSrc, surnameChar, isDeceased,
+      headNote: g=>{   // 列标题下面的小字：以「我」为基准推出这一列父系的派字
+        const cfg = paiziCfg(); if(!cfg || !viewerId) return '';
+        const v = paiziMap().get(viewerId); if(!v) return '';
+        const shi = v.shi + g, ch = Paizi.charsAt(cfg, shi);
+        return '父系·' + (ch ? ch.join('/') + '·' : '') + shi + '世';
+      }},
     viewGet: ()=>{ try{ return localStorage.getItem(KIN_VIEW_KEY)==='grid' ? 'grid' : 'tree'; }catch(e){ return 'tree'; } },
     viewSet: v=>{ try{ localStorage.setItem(KIN_VIEW_KEY, v); }catch(e){} },
     loadHtml2Canvas, toast,
@@ -2333,6 +2339,19 @@ function selectPerson(id){
   panel.addEventListener('touchcancel', end, {passive:true});
 })();
 
+/* ============ v8.29: 辈分字谱（派字）——逻辑在 paizi.js，这里只管存取和显示 ============ */
+function paiziCfg(){ const t = trees.find(x=>x.id===currentTreeId); return (t && window.Paizi && Paizi.sanitize(t.paizi)) || null; }
+function paiziMap(){ const cfg = paiziCfg(); return cfg ? Paizi.compute(people, cfg) : new Map(); }
+function paiziBoxHtml(p){
+  const cfg = paiziCfg(); if(!cfg) return '';
+  const d = Paizi.describe(p, cfg, paiziMap());
+  if(!d || !d.line) return '';   // 只对父系显示
+  const nums = escapeHtml(cfg.sys1) + '第 ' + d.shi + ' 世' + ((d.ru!=null && d.ru>=1) ? ' · ' + escapeHtml(cfg.sys2) + '第 ' + d.ru + ' 世' : '');
+  const main = d.chars
+    ? '派字「<b>' + d.chars.map(escapeHtml).join(' / ') + '</b>」' + (d.hit ? ' ✓' : ' <span class="pz-miss">（名字里没有）</span>')
+    : '<span class="pz-miss">字谱里没有这一世</span>';
+  return '<div class="paizi-box">' + main + '<div class="pz-sub">' + nums + '</div></div>';
+}
 function renderSidePanel(){
   const panel = document.getElementById('sidePanel');
   if(!selectedId || !panelOpen){ panel.classList.add('hidden'); return; }
@@ -2363,6 +2382,7 @@ function renderSidePanel(){
     </div>
     <div class="detail-name">${escapeHtml(p.name)} ${p.hidden?'<span style="color:var(--danger); font-size:12px; font-weight:600;">（已隐藏）</span>':''}</div>
     <div class="detail-years">${yearsLabel(p) || '　'}</div>
+    ${paiziBoxHtml(p)}
     ${isBridgePerson(p.id) ? `<div class="bridge-notice" data-goto-tree-panel="${escapeHtml(p.id)}">🔗 属于「${escapeHtml((trees.find(t=>t.id===(p.treeId||'main'))||{}).name||'其他家族')}」— 点击前往查看</div>` : ''}
     ${p.notes ? `<div class="detail-notes">${escapeHtml(p.notes)}</div>` : ''}
 
@@ -2936,7 +2956,7 @@ function validateAndNormalizeTrees(rawTrees){
   const cleaned = rawTrees
     .slice(0, IMPORT_LIMITS.maxTrees)
     .filter(t=>t && typeof t==='object' && typeof t.id==='string' && t.id)
-    .map(t=>({ id: t.id, name: importStr(t.name, t.id) }));
+    .map(t=>{ const o = { id: t.id, name: importStr(t.name, t.id) }; const pz = window.Paizi && Paizi.sanitize(t.paizi); if(pz) o.paizi = pz; return o; });
   return cleaned.length ? cleaned : DEFAULT_TREES.slice();
 }
 
@@ -3232,6 +3252,63 @@ document.addEventListener('keydown', (e)=>{
   }
 });
 document.getElementById('treeSelect').addEventListener('change', (e)=>switchTree(e.target.value));
+/* ---- 辈分字谱设置窗口 ---- */
+(function(){
+  const $ = id=>document.getElementById(id);
+  const ov = $('paiziOverlay');
+  function curSeq(){ return Paizi.parseSeq($('paiziSeq').value); }
+  function refreshShi(keep){
+    const seq = curSeq(), s1 = parseInt($('paiziStart1').value,10);
+    const sel = $('paiziAnchorShi'), prev = keep!==undefined ? keep : sel.value;
+    sel.innerHTML = '<option value="">（未选）</option>';
+    if(seq.length && s1>=1) seq.forEach((s,i)=>{ const o = document.createElement('option'); o.value = String(s1+i); o.textContent = (s1+i) + ' 世　' + s.split('|').join(' / '); sel.appendChild(o); });
+    if(prev && Array.from(sel.options).some(o=>o.value===String(prev))) sel.value = String(prev);
+    $('paiziSeqInfo').textContent = seq.length ? '共 ' + seq.length + ' 代' + (s1>=1 ? '（第 ' + s1 + ' – ' + (s1+seq.length-1) + ' 世）' : '') : '';
+  }
+  function openPaizi(){
+    const cfg = paiziCfg();
+    $('paiziLabel').value = cfg ? cfg.label : '';
+    $('paiziSeq').value = cfg ? cfg.seq.join(' ') : '';
+    $('paiziSys1').value = cfg ? cfg.sys1 : ''; $('paiziStart1').value = cfg ? cfg.start1 : '';
+    $('paiziSys2').value = cfg ? cfg.sys2 : ''; $('paiziStart2').value = (cfg && cfg.start2!=null) ? cfg.start2 : '';
+    const sel = $('paiziAnchor'); sel.innerHTML = '<option value="">（未选）</option>';
+    people.filter(p=>(p.treeId||'main')===currentTreeId).slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh')).forEach(p=>{
+      const o = document.createElement('option'); o.value = p.id; o.textContent = p.name + (p.id===viewerId ? '（当前视角）' : ''); sel.appendChild(o); });
+    const want = (cfg && cfg.anchorId) || viewerId || '';
+    if(want && Array.from(sel.options).some(o=>o.value===want)) sel.value = want;
+    refreshShi(cfg && cfg.anchorShi!=null ? cfg.anchorShi : '');
+    ov.classList.add('show');
+  }
+  const close = ()=>ov.classList.remove('show');
+  $('paiziOpenBtn').addEventListener('click', openPaizi);
+  $('paiziClose').addEventListener('click', close); $('paiziCancel').addEventListener('click', close);
+  ov.addEventListener('click', e=>{ if(e.target===ov) close(); });
+  $('paiziSeq').addEventListener('input', ()=>refreshShi()); $('paiziStart1').addEventListener('input', ()=>refreshShi());
+  $('paiziPreset').addEventListener('click', ()=>{
+    const P0 = Paizi.PRESET_BAIYAN;
+    $('paiziLabel').value = P0.label; $('paiziSeq').value = P0.seq.join(' ');
+    $('paiziSys1').value = P0.sys1; $('paiziStart1').value = P0.start1; $('paiziSys2').value = P0.sys2; $('paiziStart2').value = P0.start2;
+    refreshShi();
+  });
+  $('paiziClear').addEventListener('click', ()=>{
+    const t = trees.find(x=>x.id===currentTreeId); if(!t || !t.paizi){ close(); return; }
+    if(!confirm('清除这棵家族树的辈分字谱设置？（不会动任何人的资料）')) return;
+    pushHistory(); delete t.paizi; saveData(); renderSidePanel(); close(); toast('已清除');
+  });
+  $('paiziSave').addEventListener('click', ()=>{
+    const seq = curSeq(); if(!seq.length){ toast('字序是空的'); return; }
+    const start1 = parseInt($('paiziStart1').value,10); if(!(start1>=1)){ toast('请填第一个字是第几世'); return; }
+    const sys2 = $('paiziSys2').value.trim(), s2raw = $('paiziStart2').value.trim(), start2 = s2raw==='' ? null : parseInt(s2raw,10);
+    if((sys2 && start2==null) || (!sys2 && start2!=null)){ toast('第二套编号要名称和世数一起填，或者都留空'); return; }
+    const anchorId = $('paiziAnchor').value, anchorShi = parseInt($('paiziAnchorShi').value,10);
+    if((anchorId && !(anchorShi>=1)) || (!anchorId && anchorShi>=1)){ toast('锚点要选人，也要选他是第几世'); return; }
+    const cfg = Paizi.sanitize({label:$('paiziLabel').value, seq, sys1:$('paiziSys1').value || '世', start1, sys2, start2, anchorId, anchorShi: anchorShi>=1 ? anchorShi : null});
+    if(!cfg){ toast('字序里每一代必须是单个字（同一代两种写法用 | 连接）'); return; }
+    const t = trees.find(x=>x.id===currentTreeId); if(!t) return;
+    pushHistory(); t.paizi = cfg; saveData(); renderSidePanel(); close(); toast('辈分字谱已保存');
+  });
+})();
+
 document.getElementById('moveTreeClose').addEventListener('click', ()=>document.getElementById('moveTreeOverlay').classList.remove('show'));
 document.getElementById('moveTreeCancel').addEventListener('click', ()=>document.getElementById('moveTreeOverlay').classList.remove('show'));
 document.getElementById('moveTreeConfirm').addEventListener('click', confirmMoveTree);

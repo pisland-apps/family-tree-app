@@ -14,12 +14,13 @@
 // 注意：IndexedDB（用来存照片）不归 Service Worker 管，浏览器会自己持久化，
 // 不需要在这里做任何处理。
 
-const CACHE_VERSION = 'family-tree-v8.28'; // bump alongside APP_VERSION in app.js on every deploy
+const CACHE_VERSION = 'family-tree-v8.29'; // bump alongside APP_VERSION in app.js on every deploy
 const APP_SHELL = [
   './',
   './app.js',
   './kinship.js',
   './kintree.js',
+  './paizi.js',
   './html2canvas.min.js',
   './manifest.json',
   './icons/icon-192.png',
