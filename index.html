@@ -943,6 +943,17 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
 .viewer-bar{position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:60; display:flex; gap:8px; align-items:center; padding:7px 12px; background:#fff; border:1px solid #d9cdbd; border-radius:999px; box-shadow:0 4px 14px rgba(0,0,0,.15); font-size:13px;}
 .viewer-bar button{border:1px solid #d9cdbd; background:#faf6f0; border-radius:999px; padding:3px 10px; cursor:pointer; font:inherit;}
 .kin-box{margin:10px 0; padding:8px 10px; background:#fbf3ec; border-radius:8px; text-align:left; font-size:13px;}
+.pzc-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(78px,1fr)); gap:8px;}
+.pzc-cell{border:1px solid #e3d6a8; background:#fdf3e6; border-radius:12px; padding:8px 4px; text-align:center; cursor:pointer; font:inherit; color:inherit; line-height:1.35;}
+.pzc-cell .c{display:block; font-size:22px; font-weight:700; color:#a05a1e;}
+.pzc-cell .s{display:block; font-size:11px; color:#7d7468;}
+.pzc-cell .n{display:block; font-size:12px;}
+.pzc-cell .m{display:block; font-size:10px; color:#3f5a3a;}
+.pzc-cell.empty{background:#f1efec; border-color:#e5e2dc; cursor:default;} .pzc-cell.empty .c{color:#a8a39b; font-weight:400;}
+.pzc-cell.on{outline:2px solid #3f5a3a;}
+.pzc-list{margin-top:12px; font-size:14px;} .pzc-list h4{margin:0 0 6px; font-size:14px;}
+.pzc-list button{display:inline-block; margin:2px 4px 2px 0; padding:3px 10px; border:1px solid #d9d2c2; border-radius:99px; background:transparent; font:inherit; color:inherit; cursor:pointer;}
+.pzc-list .miss{border-style:dashed; color:#8a7a68;}
 .paizi-box{margin:10px 0; padding:8px 10px; background:#eef4ea; border-radius:8px; text-align:left; font-size:13px; color:#3f5a3a;}
 .paizi-box .pz-sub{color:#6b7f66; font-size:12px; margin-top:2px;} .paizi-box .pz-miss{color:#8a7a68;}
 .kin-chain{color:#6b5b4b; margin-top:3px;} .kin-hint{color:#a05a2c; margin-top:3px; font-size:12px;}
@@ -1066,6 +1077,7 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
         <button role="menuitem" class="mi-phone" data-proxy="compactBtn">◉ 切换紧凑视图</button>
         <button role="menuitem" class="mi-mid" data-proxy="mapBtn">🗺 地图</button>
         <button role="menuitem" data-proxy="paiziOpenBtn">字 辈分字谱（派字）</button>
+        <button role="menuitem" data-proxy="paiziCountBtn">字 各世人数（派字对照）</button>
         <button role="menuitem" data-proxy="paiziRefBtn">📜 林氏宗支派序对照表</button>
         <button role="menuitem" data-proxy="helpBtn">❓ 使用说明</button>
         <button role="menuitem" class="mi-phone" data-proxy="lockNowBtn">🔒 立即锁定</button>
@@ -1075,6 +1087,7 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
       </div>
     </div>
     <button type="button" id="paiziRefBtn" style="display:none" aria-hidden="true" tabindex="-1"></button>
+    <button type="button" id="paiziCountBtn" style="display:none" aria-hidden="true" tabindex="-1"></button>
     <button type="button" id="paiziOpenBtn" style="display:none" aria-hidden="true" tabindex="-1"></button>
     <button class="btn btn-ghost" id="compactBtn" title="紧凑视图：圆形头像 + 婚姻连接点" aria-pressed="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="8" r="3"/><circle cx="17" cy="8" r="3"/><path d="M10 8h4"/><path d="M12 8v6M7 20v-3h10v3"/></svg>
@@ -1540,6 +1553,20 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
       <button class="btn btn-ghost" id="paiziClear" style="margin-right:auto; color:var(--danger); padding:8px 12px; min-width:0;">清除设置</button>
       <button class="btn btn-ghost" id="paiziCancel" style="padding:8px 14px; min-width:0;">取消</button>
       <button class="btn btn-primary" id="paiziSave" style="padding:8px 18px; min-width:0;">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="paiziCountOverlay">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <h2>各世人数（派字对照）</h2>
+      <button class="modal-close" id="paiziCountClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="hint" id="paiziCountHint" style="margin-bottom:10px;"></p>
+      <div id="paiziCountGrid" class="pzc-grid"></div>
+      <div id="paiziCountList" class="pzc-list"></div>
     </div>
   </div>
 </div>

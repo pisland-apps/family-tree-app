@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.40';
+const APP_VERSION = 'v8.41';
 const APP_VERSION_DATE = '2026-10-31';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -3317,6 +3317,56 @@ document.getElementById('treeSelect').addEventListener('change', (e)=>switchTree
     const t = trees.find(x=>x.id===currentTreeId); if(!t) return;
     pushHistory(); t.paizi = cfg; saveData(); renderSidePanel(); close(); toast('辈分字谱已保存');
   });
+})();
+
+/* ---- 各世人数窗口（v8.41）：字谱每一世一格，显示这一世在家谱里有几个父系的人 ---- */
+(function(){
+  const $ = id=>document.getElementById(id);
+  const ov = $('paiziCountOverlay'); if(!ov) return;
+  let selShi = null;
+  function build(){
+    const cfg = paiziCfg();
+    const grid = $('paiziCountGrid'), list = $('paiziCountList'), hint = $('paiziCountHint');
+    grid.innerHTML = ''; list.innerHTML = '';
+    if(!cfg){ hint.textContent = '还没有设置辈分字谱：先到「辈分字谱（派字）」选一份字序、设好锚点。'; return; }
+    if(!cfg.anchorId || cfg.anchorShi==null){ hint.textContent = '还没有设置锚点（某个人是第几世），算不出每个人是第几世。请先在「辈分字谱（派字）」里设好。'; return; }
+    const map = paiziMap();
+    const nl = (cfg.nanlai && cfg.nanlai.length) ? Paizi.nanlaiGen(people, cfg.nanlai) : null;
+    const byShi = new Map(); let outside = 0, total = 0;
+    people.filter(p=>(p.treeId||'main')===currentTreeId).forEach(p=>{
+      const d = Paizi.describe(p, cfg, map); if(!d || !d.line) return;   // 只数父系
+      total++;
+      if(!d.chars){ outside++; return; }
+      if(!byShi.has(d.shi)) byShi.set(d.shi, []); byShi.get(d.shi).push({p, d});
+    });
+    hint.textContent = '只数父系的人（嫁进来的配偶、继 / 养 / 干亲不算）；共 ' + total + ' 人' + (outside ? '，其中 ' + outside + ' 人的世代超出字谱' : '') + '。点一格看是哪几个人。';
+    Paizi.shiList(cfg).forEach(({shi, chars})=>{
+      const arr = byShi.get(shi) || [];
+      const b = document.createElement('button'); b.type = 'button';
+      b.className = 'pzc-cell' + (arr.length ? '' : ' empty') + (selShi===shi ? ' on' : '');
+      let extra = '';
+      if(arr.length){ const hit = arr.filter(x=>x.d.hit).length; extra += '<span class="m">' + hit + ' 人用了派字</span>'; }
+      if(nl){ const gens = arr.map(x=>nl.get(x.p.id)).filter(g=>g!=null); if(gens.length) extra += '<span class="m">南来第 ' + Math.min.apply(null, gens) + ' 代</span>'; }
+      b.innerHTML = '<span class="c">' + (arr.length ? chars.map(escapeHtml).join('/') : '—') + '</span><span class="s">' + escapeHtml(cfg.sys1) + ' ' + shi + '</span><span class="n">' + (arr.length ? arr.length + ' 人' : '') + '</span>' + extra;
+      if(arr.length) b.addEventListener('click', ()=>{ selShi = shi; build(); });
+      grid.appendChild(b);
+    });
+    if(selShi!=null && byShi.has(selShi)){
+      const chars = Paizi.charsAt(cfg, selShi) || [];
+      list.innerHTML = '<h4>' + escapeHtml(cfg.sys1) + ' 第 ' + selShi + ' 世 · 派字「' + chars.map(escapeHtml).join(' / ') + '」</h4>';
+      byShi.get(selShi).forEach(({p, d})=>{
+        const x = document.createElement('button'); x.type = 'button';
+        x.className = d.hit ? '' : 'miss'; x.textContent = p.name + (d.hit ? '' : '（名字里没有）');
+        x.addEventListener('click', ()=>{ ov.classList.remove('show'); enterFocus(p.id); });
+        list.appendChild(x);
+      });
+      list.scrollIntoView({block:'nearest'});   // 格子很多时，名单在下面，点完自动滚到
+    }
+  }
+  $('paiziCountBtn').addEventListener('click', ()=>{ selShi = null; build(); ov.classList.add('show'); });
+  const close = ()=>ov.classList.remove('show');
+  $('paiziCountClose').addEventListener('click', close);
+  ov.addEventListener('click', e=>{ if(e.target===ov) close(); });
 })();
 
 document.getElementById('moveTreeClose').addEventListener('click', ()=>document.getElementById('moveTreeOverlay').classList.remove('show'));
