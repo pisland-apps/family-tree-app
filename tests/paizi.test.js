@@ -10,7 +10,7 @@ eq(P.parseSeq('').length, 0, '空');
 // 2. 预设：方 = 坚公 134 世 = 入琼 30 世；奕 = 136；137 世两种写法
 const cfg0 = P.sanitize(P.PRESET_BAIYAN);
 eq(P.charsAt(cfg0,134), ['方'], '134 世'); eq(P.charsAt(cfg0,132), ['廷'], '132 世'); eq(P.charsAt(cfg0,136), ['奕'], '136 世');
-eq(P.charsAt(cfg0,137), ['世','鲁'], '137 世两种写法'); eq(P.charsAt(cfg0,141), ['宗'], '141 世'); eq(P.charsAt(cfg0,157), null, '超出字谱'); eq(P.charsAt(cfg0,120), null, '早于字谱');
+eq(P.charsAt(cfg0,137), ['世'], '137 世照原表只写世'); eq(P.charsAt(cfg0,140), ['成'], '140 世成'); eq(P.charsAt(cfg0,141), ['宗'], '141 世'); eq(P.charsAt(cfg0,157), null, '超出字谱'); eq(P.charsAt(cfg0,120), null, '早于字谱');
 eq(P.PRESET_BAIYAN.seq.length, 36, '121 – 156 世共 36 代');
 // 3. 一个家：廷(祖父) 日(父) 方(我，锚点)；叔叔；姑姑；堂弟；我的儿子升、女儿；外家；妻子；继父养子
 const P_ = [
