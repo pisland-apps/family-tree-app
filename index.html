@@ -1530,6 +1530,11 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
         <div class="field"><label>锚点：这个人是</label><select id="paiziAnchor"></select></div>
         <div class="field"><label>他是第几世</label><select id="paiziAnchorShi"></select></div>
       </div>
+      <div class="field">
+        <label>南来始祖（第 1 代南来的人；同期南来的兄弟一起选，电脑按住 Ctrl 多选，不用就不选）</label>
+        <select id="paiziNanlai" multiple size="5" style="width:100%;"></select>
+        <div class="hint" style="margin-top:4px;">他们的亲生后代（包括女儿一支）会显示「南来第几代」，配偶和继 / 养 / 干亲不显示。</div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" id="paiziClear" style="margin-right:auto; color:var(--danger); padding:8px 12px; min-width:0;">清除设置</button>

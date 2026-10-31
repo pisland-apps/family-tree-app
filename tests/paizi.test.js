@@ -57,4 +57,15 @@ const V = [mk('g','林廷','M'), mk('f','林日','M',{parents:['g']}), mk('m','�
 const cv = P.sanitize(Object.assign({}, P.PRESET_BAIYAN, {anchorId:'m', anchorShi:134})); const mv = P.compute(V, cv); const dv = id=>P.describe(V.find(p=>p.id===id), cv, mv);
 eq([dv('m').hit, dv('m').found], [true,'坊'], '坊 命中 方'); eq([dv('s').hit, dv('s').found], [true,'昇'], '昇 命中 升'); eq(dv('s2').hit, false, '没有派字仍提示');
 eq(P.sameChar('运','運'), true, '繁体「運」=「运」'); eq(P.charsAt(cv,134), ['方'], '字谱本身不被改动');
+// 8. 南来第几代：始祖 1 代，后代（含女儿一支）逐代 +1，配偶不算；多始祖取最小；环不卡死
+const N = [mk('a','廷','M'), mk('b1','兄','M'), mk('b2','弟','M'), mk('w','妻','F',{spouses:['a']}),
+  mk('c','日','M',{parents:['a','w']}), mk('d','女','F',{parents:['a','w']}), mk('e','外孙','M',{parents:['d']}), mk('f','曾外孙','M',{parents:['e']}), mk('g','兄之子','M',{parents:['b1']}), mk('x','路人','M')];
+const ng = P.nanlaiGen(N, ['a','b1','b2']);
+eq([ng.get('a'),ng.get('b1'),ng.get('c'),ng.get('d'),ng.get('e'),ng.get('f'),ng.get('g')], [1,1,2,2,3,4,2], '南来代数');
+eq([ng.has('w'), ng.has('x')], [false,false], '配偶和无关的人没有');
+eq(P.nanlaiGen([mk('a','a','M',{parents:['b']}), mk('b','b','M',{parents:['a']})], ['a']).size <= 2, true, '环不卡死');
+eq(P.nanlaiGen(N, []).size, 0, '没设始祖');
+eq(P.sanitize({seq:['甲'], nanlai:['a','a','b',3]}).nanlai, ['a','b'], 'nanlai 清洗去重');
+const N2 = [mk('a','廷','M'), mk('s','继子','M',{parents:['a'],parentTypes:{a:'step'}}), mk('ad','养子','M',{parents:['a'],parentTypes:{a:'adopt'}}), mk('sk','继子之子','M',{parents:['s']}), mk('ok','亲生','M',{parents:['a']})];
+const ng2 = P.nanlaiGen(N2, ['a']); eq([ng2.get('ok'), ng2.has('s'), ng2.has('ad'), ng2.has('sk')], [2,false,false,false], '南来只认亲生');
 console.log(bad ? '失败 '+bad : '全部通过'); process.exitCode = bad ? 1 : 0;

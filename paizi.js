@@ -80,6 +80,11 @@ function sanitize(raw){
     anchorShi: isInt(raw.anchorShi,1,9999) ? raw.anchorShi : null
   };
   if(!cfg.sys2) cfg.start2 = null;
+  // 南来始祖：第 1 代南来的人（可以不止一个，例如同期南来的兄弟）
+  if(Array.isArray(raw.nanlai)){
+    const ids = Array.from(new Set(raw.nanlai.filter(x=>typeof x==='string' && x).map(x=>x.slice(0,80)))).slice(0,20);
+    if(ids.length) cfg.nanlai = ids;
+  }
   return cfg;
 }
 
@@ -130,6 +135,26 @@ function compute(people, cfg){
   return res;
 }
 
+/* 南来第几代：南来始祖 = 第 1 代，往下所有后代（儿子、女儿、女儿的孩子……）每代 +1。
+   只认亲生（继 / 养 / 干亲不算）。和派字不同：不分父系，女儿一支也算（同样是在南洋出生的一代）；配偶不算（她 / 他可能是别处来的）。
+   多个始祖（同期南来的兄弟）各自从 1 起算，取最小值。 */
+function nanlaiGen(people, ids){
+  const res = new Map();
+  if(!Array.isArray(ids) || !ids.length) return res;
+  const byId = new Map(people.map(p=>[p.id,p]));
+  const kids = new Map();
+  // 只认亲生：标了「继 / 养 / 干」的亲子关系不算（和派字一致）
+  people.forEach(p=>(p.parents||[]).forEach(pid=>{ if((p.parentTypes||{})[pid]) return; if(!kids.has(pid)) kids.set(pid,[]); kids.get(pid).push(p.id); }));
+  const q = [];
+  ids.forEach(id=>{ if(byId.has(id)){ res.set(id,1); q.push(id); } });
+  while(q.length){
+    const id = q.shift(), g = res.get(id);
+    (kids.get(id)||[]).forEach(c=>{ if(!res.has(c) || res.get(c) > g+1){ res.set(c, g+1); q.push(c); } });
+    if(res.size > people.length + 5) break;   // 数据成环时的保险
+  }
+  return res;
+}
+
 /* 给详情面板用：这个人的世代、派字、名字里有没有 */
 function describe(person, cfg, map){
   const r = map && map.get(person.id);
@@ -143,6 +168,6 @@ function describe(person, cfg, map){
   return {shi: r.shi, ru, chars, line: r.line, hit: (chars && name) ? !!found : null, found};
 }
 
-const api = {PRESETS, PRESET_BAIYAN, parseSeq, sanitize, charsAt, shiList, compute, describe, variantsOf, sameChar};
+const api = {PRESETS, PRESET_BAIYAN, parseSeq, sanitize, charsAt, shiList, compute, describe, variantsOf, sameChar, nanlaiGen};
 if(typeof module!=='undefined' && module.exports) module.exports = api; else root.Paizi = api;
 })(typeof window!=='undefined' ? window : globalThis);

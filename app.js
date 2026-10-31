@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.38';
+const APP_VERSION = 'v8.40';
 const APP_VERSION_DATE = '2026-10-31';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2345,8 +2345,12 @@ function paiziMap(){ const cfg = paiziCfg(); return cfg ? Paizi.compute(people, 
 function paiziBoxHtml(p){
   const cfg = paiziCfg(); if(!cfg) return '';
   const d = Paizi.describe(p, cfg, paiziMap());
-  if(!d || !d.line) return '';   // 只对父系显示
-  const nums = escapeHtml(cfg.sys1) + '第 ' + d.shi + ' 世' + ((d.ru!=null && d.ru>=1) ? ' · ' + escapeHtml(cfg.sys2) + '第 ' + d.ru + ' 世' : '');
+  const nl = (cfg.nanlai && cfg.nanlai.length) ? Paizi.nanlaiGen(people, cfg.nanlai).get(p.id) : null;
+  const nlTxt = nl ? '南来第 ' + nl + ' 代' : '';
+  if(!d || !d.line){   // 派字只对父系显示；但南来代数不分父系
+    return nlTxt ? '<div class="paizi-box"><div class="pz-sub" style="margin-top:0;">' + nlTxt + '</div></div>' : '';
+  }
+  const nums = escapeHtml(cfg.sys1) + '第 ' + d.shi + ' 世' + ((d.ru!=null && d.ru>=1) ? ' · ' + escapeHtml(cfg.sys2) + '第 ' + d.ru + ' 世' : '') + (nlTxt ? ' · ' + nlTxt : '');
   const main = d.chars
     ? '派字「<b>' + d.chars.map(escapeHtml).join(' / ') + '</b>」' + (d.hit ? (d.chars.indexOf(d.found)>=0 ? ' ✓' : ' ✓ <span class="pz-miss">（名字用「' + escapeHtml(d.found) + '」）</span>') : ' <span class="pz-miss">（名字里没有）</span>')
     : '<span class="pz-miss">字谱里没有这一世</span>';
@@ -3276,6 +3280,10 @@ document.getElementById('treeSelect').addEventListener('change', (e)=>switchTree
       const o = document.createElement('option'); o.value = p.id; o.textContent = p.name + (p.id===viewerId ? '（当前视角）' : ''); sel.appendChild(o); });
     const want = (cfg && cfg.anchorId) || viewerId || '';
     if(want && Array.from(sel.options).some(o=>o.value===want)) sel.value = want;
+    const ns = $('paiziNanlai'); ns.innerHTML = '';
+    const chosen = new Set((cfg && cfg.nanlai) || []);
+    people.filter(p=>(p.treeId||'main')===currentTreeId).slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh')).forEach(p=>{
+      const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; o.selected = chosen.has(p.id); ns.appendChild(o); });
     refreshShi(cfg && cfg.anchorShi!=null ? cfg.anchorShi : '');
     ov.classList.add('show');
   }
@@ -3304,7 +3312,7 @@ document.getElementById('treeSelect').addEventListener('change', (e)=>switchTree
     if((sys2 && start2==null) || (!sys2 && start2!=null)){ toast('第二套编号要名称和世数一起填，或者都留空'); return; }
     const anchorId = $('paiziAnchor').value, anchorShi = parseInt($('paiziAnchorShi').value,10);
     if((anchorId && !(anchorShi>=1)) || (!anchorId && anchorShi>=1)){ toast('锚点要选人，也要选他是第几世'); return; }
-    const cfg = Paizi.sanitize({label:$('paiziLabel').value, seq, sys1:$('paiziSys1').value || '世', start1, sys2, start2, anchorId, anchorShi: anchorShi>=1 ? anchorShi : null});
+    const cfg = Paizi.sanitize({label:$('paiziLabel').value, seq, sys1:$('paiziSys1').value || '世', start1, sys2, start2, anchorId, anchorShi: anchorShi>=1 ? anchorShi : null, nanlai: Array.from($('paiziNanlai').selectedOptions).map(o=>o.value)});
     if(!cfg){ toast('字序里每一代必须是单个字（同一代两种写法用 | 连接）'); return; }
     const t = trees.find(x=>x.id===currentTreeId); if(!t) return;
     pushHistory(); t.paizi = cfg; saveData(); renderSidePanel(); close(); toast('辈分字谱已保存');
