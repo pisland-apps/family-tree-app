@@ -98,3 +98,19 @@ if(r9.get('rc').title!=='远房表哥/弟') process.exitCode=1;
   r=K.compute(Q,'a',{dialect:'hakka_sb',custom:{'干爹':'契爸'}}); if(T(r,'gd')!=='契爸') process.exitCode=1;
   a.parentTypes={gd:'adopt'}; r=K.compute(Q,'a'); console.log('养仍是:',T(r,'gd'),T(r,'gp'));
   if(T(r,'gd')!=='养父'||!/（继\/养）$/.test(T(r,'gp'))) process.exitCode=1; }
+
+// v8.45：高祖辈的其他妻子、曾祖辈兄弟姐妹及配偶、祖父的另一位妻子
+(function(){
+  const Q=[],q={};
+  const a=(k,n,g,b,ps=[])=>{q[k]={id:k,name:n,gender:g,birth:String(b),parents:ps,spouses:[]};Q.push(q[k]);};
+  const w=(x,y)=>{q[x].spouses.push(y);q[y].spouses.push(x);};
+  a('g4','高祖父','M',1876); a('w1','大妻','F',1880); w('g4','w1');
+  a('g3','曾祖父','M',1926,['g4']); a('s1','雲瓊','F',1920,['g4']); a('s1h','道德','M',1918); w('s1','s1h');
+  a('s2','日庚','M',1933,['g4']); a('s2w','蔓蒂','F',1935); w('s2','s2w');
+  a('g2','祖父','M',1949,['g3']); a('g2x','瑞芳','F',1952); w('g2','g2x');
+  a('f','父亲','M',1975,['g2']); a('me','我','M',2000,['f']);
+  const R=K.compute(Q,'me');
+  const want={w1:'继高祖母',s1:'曾姑祖母',s1h:'曾姑祖父',s2:'曾叔祖父',s2w:'曾叔祖母',g2x:'继祖母'};
+  for(const k in want){ const t=R.get(k).title; if(t!==want[k]){ console.log('✗ v8.45',k,'期望',want[k],'得到',t); process.exitCode=1; } }
+  console.log('v8.45 高祖辈/曾祖辈称谓用例通过');
+})();

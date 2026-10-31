@@ -116,10 +116,13 @@ function blood(P, es){
   if(!a){
     if(b===1) return {t:sx(last,'儿子','女儿'),k:'child'};
     if(b===2) return {t:(sx(P[1],1,0)?'':'外')+sx(last,'孙子','孙女'),k:'gchild'};
+    if(b===3) return {t:((sx(P[1],1,0)&&sx(P[2],1,0))?'':'外')+sx(last,'曾孙','曾孙女'),k:'ggchild'};
+    if(b===4) return {t:((sx(P[1],1,0)&&sx(P[2],1,0)&&sx(P[3],1,0))?'':'外')+sx(last,'玄孙','玄孙女'),k:'ggchild'};
     return null;
   }
   if(a===1&&b===1){ const o=older(last,me); return {t:sx(last,ab(o,'哥哥','弟弟'),ab(o,'姐姐','妹妹')),k:'sib',o}; }
   if(a===1&&b===2) return {t:sx(P[2],'侄','外甥')+sx(last,'子','女'),k:'nephew'};
+  if(a===1&&b===3) return {t:sx(P[2],'侄孙','外甥孙')+sx(last,'','女'),k:'nephew2'};
   if(a===2&&b===1){
     const par=P[1];
     if(sx(par,1,0)){ const t = sx(last, ab(older(last,par),'伯父','叔叔'),'姑妈'); return {t,k:'uncle'}; }
@@ -149,12 +152,30 @@ function blood(P, es){
     if(g2m) return {t:sx(last, g1m ? ab(older(last,P[2]),'伯祖父','叔祖父') : ab(older(last,P[2]),'大姥爷','小姥爷'), g1m?'姑奶奶':'姑姥姥'),k:'gsib'};
     return {t:sx(last, g1m?'舅爷':'舅姥爷', g1m?'姨奶奶':'姨姥姥'),k:'gsib'};
   }
+  if(a===4&&b===1){ // 曾祖辈的兄弟姐妹（高祖父母的其他子女）
+    const pre=(sx(P[1],1,0)&&sx(P[2],1,0)&&sx(P[3],1,0))?'曾':'外曾';
+    return {t:sx(last, ab(older(last,P[3]),pre+'伯祖父',pre+'叔祖父'), pre+'姑祖母'),k:'gsib'};
+  }
+  if(a===4&&b===2){ // 曾祖辈兄弟姐妹的子女 = 祖父母的堂/表兄弟姐妹
+    const pre=(sx(P[1],1,0)&&sx(P[2],1,0)&&sx(P[3],1,0)&&sx(P[5],1,0))?'堂':'表';
+    return {t:sx(last, ab(older(last,P[2]),pre+'伯祖',pre+'叔祖'), pre+'祖姑'),k:'pcousin'};
+  }
   return null;
 }
 const SPOUSE_OF = {'伯父':'伯母','叔叔':'婶婶','舅舅':'舅妈','姑妈':'姑丈','姨妈':'姨丈',
   '堂伯':'堂伯母','堂叔':'堂婶','表伯':'表伯母','表叔':'表婶','表姑妈':'表姑丈','表舅':'表舅妈','表姨妈':'表姨丈',
   '伯祖父':'伯祖母','叔祖父':'叔祖母','姑奶奶':'姑爷','大姥爷':'大姥姥','小姥爷':'小姥姥','姑姥姥':'姑姥爷',
   '舅爷':'舅奶奶','舅姥爷':'舅姥姥','姨奶奶':'姨爷','姨姥姥':'姨姥爷'};
+
+function spouseOf(x){
+  if(SPOUSE_OF[x]) return SPOUSE_OF[x];
+  let m;
+  if((m=x.match(/^(.*(?:伯祖|叔祖))父$/))) return m[1]+'母';
+  if((m=x.match(/^(.*(?:伯祖|叔祖))$/))) return m[1]+'母';
+  if((m=x.match(/^(.*)姑祖母$/))) return m[1]+'姑祖父';
+  if((m=x.match(/^(.*)祖姑$/))) return m[1]+'祖姑丈';
+  return undefined;
+}
 
 /* ---------- 含一条配偶边的路径 ---------- */
 function withSpouse(P, es){
@@ -173,9 +194,16 @@ function withSpouse(P, es){
     const rel=P[P.length-2], r=blood(P.slice(0,-1), es.slice(0,-1)); if(!r) return null;
     if(r.k==='sib') return (()=>{ const o=older(rel,me); return sx(rel, ab(o,'嫂嫂','弟媳'), ab(o,'姐夫','妹夫')); })();
     if(r.k==='child') return sx(rel,'儿媳','女婿');
-    if(r.k==='uncle'||r.k==='pcousin'||r.k==='gsib') { const m=r.t.split('/').map(x=>SPOUSE_OF[x]); return m.every(Boolean) ? m.join('/') : null; }
+    if(r.k==='uncle'||r.k==='pcousin'||r.k==='gsib') { const m=r.t.split('/').map(spouseOf); return m.every(Boolean) ? m.join('/') : null; }
     if(r.k==='cousin'||r.k==='rcousin'){ const pre=r.k==='rcousin'?r.t.slice(0,3):r.t[0]; return sx(rel, ab(r.o,pre+'嫂',pre+'弟媳'), ab(r.o,pre+'姐夫',pre+'妹夫')); }
     if(r.k==='parent') return sx(rel,'继母','继父');
+    if(r.k==='anc'){ // 祖先的另一位配偶（不是自己这一支的祖父母）：继祖母/继高祖母…
+      const t=r.t.replace(/[父母]$/, sx(rel,'母','父')); return '继'+t;
+    }
+    if(r.k==='nephew'){ const w=r.t.startsWith('外甥'); return sx(rel, w?'外甥媳妇':'侄媳', w?'外甥女婿':'侄女婿'); }
+    if(r.k==='nephew2') return sx(rel,'侄孙媳','侄孙女婿');
+    if(r.k==='gchild'){ const w=r.t.startsWith('外'); return sx(rel, w?'外孙媳':'孙媳', w?'外孙女婿':'孙女婿'); }
+    if(r.k==='ggchild') return sx(rel, r.t.startsWith('外')?'外曾孙媳':'曾孙媳', r.t.startsWith('外')?'外曾孙女婿':'曾孙女婿');
   }
   return null;
 }
