@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>林氏宗支派序对照表 · 新版</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#faf8f3;--fg:#222;--mut:#6b6558;--card:#fff;--line:#e6e1d4;--red:#7a1f1f;--hi:#fff1bf;--hi2:#ffe08a;--gold:#8a6d3b;--warn:#fdecea;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17150f;--fg:#ece6d8;--mut:#a79f8c;--card:#211e16;--line:#3a3526;--red:#e08a7a;--hi:#4a3d10;--hi2:#6b5614;--gold:#d3b06a;--warn:#3a1d1a;}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.75 "Noto Sans CJK SC","PingFang SC","Microsoft YaHei",sans-serif}
+main{max-width:1080px;margin:0 auto;padding:20px 14px 60px}
+h1{text-align:center;font-size:26px;letter-spacing:3px;margin:8px 0 2px;color:var(--red)}
+.sub{text-align:center;color:var(--mut);font-size:13px;margin:0 0 18px}
+h2{color:var(--red);border-bottom:2px solid var(--red);padding-bottom:4px;font-size:18px;margin:34px 0 10px}
+h3{font-size:15px;color:var(--gold);margin:16px 0 4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0}
+.finder{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.finder label{font-size:12px;color:var(--mut);display:block}
+select,input{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+input{width:7em}
+#res{margin-top:10px;min-height:1.6em}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:560px}
+th{background:var(--red);color:#fff;padding:7px 8px;font-size:13px;position:sticky;top:0;white-space:nowrap}
+th.me{background:var(--gold)}
+td{border-bottom:1px solid var(--line);padding:3px 8px;text-align:center;font-size:15px}
+td.n{color:var(--mut);font-size:12px}
+td.c{font-weight:700}
+tr:hover td{background:var(--hi)}
+tr.on td{background:var(--hi2)}
+td.hit{background:var(--hi2);outline:2px solid var(--gold);outline-offset:-2px}
+td.alt{font-size:13px}
+.side{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.mini{max-height:280px;overflow:auto}
+.mini table{min-width:0}
+.tag{display:inline-block;padding:0 8px;border-radius:99px;background:var(--hi);font-size:12px;margin:0 2px}
+.warn{background:var(--warn);border-left:4px solid var(--red);padding:10px 14px;border-radius:6px;margin:10px 0;font-size:14px}
+ol,ul{padding-left:22px;margin:6px 0}li{margin:4px 0}
+.mut{color:var(--mut);font-size:13px}
+</style></head><body><main>
+<p><a href="./" style="color:var(--red)">← 返回家谱</a></p>
+<h1>林氏宗支派序对照表</h1>
+<p class="sub">Hainanese Lim’s Generation Chart · 新版(据扫描原件重新核对)<br>原整理:林日锦 · 源:海南联会会讯(66)·林氏公会 56 周年特刊(2006)</p>
+
+<div class="card"><b>快速查询</b>
+<div class="finder">
+<div><label>我属于哪一派</label><select id="pai"></select></div>
+<div><label>输入名字里的辈分字</label><input id="ch" maxlength="1" placeholder="如:方"></div>
+<div><label>或输入坚公第几世</label><input id="shi" type="number" min="117" max="158" placeholder="134"></div>
+</div><div id="res" class="mut">选择派别后,输入一个字或世代,表中会高亮对应位置。</div></div>
+
+<h2>一、主表:坚公世代 ↔ 入琼世代 ↔ 三个派</h2>
+<div class="scroll"><table id="main"><thead><tr><th>坚公世</th><th>入琼世</th><th class="me" data-p="baiyan">白延派 ✓</th><th data-p="xixi">溪西派</th><th data-p="guanding">观定派</th></tr></thead><tbody></tbody></table></div>
+<p class="mut">黄色粗框 = 查询命中。「<b>世|鲁</b>」类斜线写法 = 同一代有两种说法,以家人实际用字为准。红字「宗」= 白延与溪西合流点(入琼 37 世)。</p>
+
+<h2>二、另外三支的字辈(各有自己的世代数)</h2>
+<div class="side" id="side"></div>
+<p class="mut">三支都换算回坚公世,可与主表同行对照。肖山公、奇昌公本人是各自第 1 世,所以字辈表从第 2 世起。</p>
+
+<h2>三、怎么看(给后代)</h2>
+<ol>
+<li><b>两套编号恒差 104</b>:入琼世 = 坚公世 − 104。平时说「第几代」多指入琼世。</li>
+<li><b>找到自己的派</b>(你家:白延派),在那一列往下数:有 兆 昌 家 适 … <b>廷 日 方 升 奕 世 扬 名 成 宗</b> …</li>
+<li><b>每辈一个字</b>,放在名字首或尾。例:祖父廷 → 父日 → 己方 → 子升 → 孙奕。</li>
+<li><b>名词</b>:坚公 = 入闽始祖;通公 = 入琼始祖(入琼世从他算起,他本人是入琼第 1 世);白延 / 溪西 / 观定 = 定居地形成的分支。</li>
+<li><b>分派由来</b>:通公字自明代用「文士用世时」;至洵仁公后分克敏派(溪西)与克恭派(白延),各自续字,直到「宗」字重新联用。</li>
+</ol>
+<div class="warn"><b>对原表“说明”的正确读法:</b>「坚公传至 124 代时,入闽禄公 45 代、入琼裕公 26 代、入琼通公 20 代、肖山公 1 代」,意思是<b>同一个第 124 世的人,在各支各自的数法里是第几代</b>,并不是说这些祖先本人是 124 世。(通公本人 = 入琼 1 世 = 坚公 105 世。)</div>
+
+<h2>四、我的意见</h2>
+<h3>1. 这张表应当当作「参考」,不是「判决」</h3>
+<p>海南林氏迁居东南亚后,跳字、改字、不按字辈取名很常见。所以我不赞成用「名字里有没有辈分字」来判断对错。家谱软件里只提示、不报错,是对的。</p>
+<h3>2. 家谱里只存「一个锚点」,其他全部推算</h3>
+<p>在家谱里只记「某人 = 坚公第几世」,其余人按父母 −1、子女 +1、配偶 0 自动算出。这样搬动、增删人物都不会让世代失效。这也是新版应用采用的做法。</p>
+<h3>3. 统一以「坚公世」为主编号</h3>
+<p>各支自己的编号(入琼、裕公、肖山、奇昌)都不一样,但都能换算到坚公世。用坚公世做主轴,不同支的族人才能互相对照辈分。</p>
+<h3>4. 有争议的地方,两种都保留,不要替祖先做决定</h3>
+<p>坚公 137–140 世:白延派写「世 扬 名 成」,表尾备注说各支统一用「鲁 国 礼 启 宗」,备注自己写着「待查考证实」。我的建议:两种并列保存,让你们实际的家人去证实;找到原谱后再改。</p>
+<h3>5. 给后代续字的建议</h3>
+<ul><li>白延派字序到「绪」(坚公 156 世 = 入琼 52 世)就用完了。大约还要几代,可以先<b>集体商定</b>续字,不要各家自己编。</li><li>续字建议<b>吉祥、笔画简单、不与前面重复、男女通用</b>,避免与常用姓名字冲突(当地登记、英文拼写都要方便)。</li><li>商定后<b>在家谱应用里保存为自己的派字序</b>,并注明「谁定的、哪一年」,以免日后又失传。</li></ul>
+<h3>6. 保存时一定要写来源和版本</h3>
+<p>这张表本身是扫描件转录,已出现多处误读。每次转录都要注明来源与日期,有疑字的要标出来。</p>
+
+<h2>五、本次核对发现的错误(重要)</h2>
+<div class="warn">我对照扫描件,发现之前流传的「清晰版」有以下问题,新版已改正:</div>
+<ol>
+<li><b>观定派错位一行</b>:原表「日」在坚公 <b>123</b> 世(不是 124),「腾」在 <b>145</b> 世(入琼 41),「芳」在 146 世。</li>
+<li><b>肖山公、奇昌公被拆成两代</b>:原表「肖山」「奇昌」各占第 1 代的一格,不是两个字各一代。所以肖山公最后的「名」是第 <b>20</b> 世(坚公 143),不是 21;奇昌公共 <b>15</b> 世,不是 16。另外肖山公第 8 世原表是「启」,清晰版写成了「后」。</li>
+<li><b>裕公派被两字并一行</b>:原表每世一个字(赞、建、国|绍、家|子、升、士、启、克、绍、诗、书…威),清晰版把相邻两字并到一行,造成之后所有世代都错位。</li>
+<li><b>溪西派 124–128 世漏了第二行</b>「文 章 华 国 诗」,现以「其|文、所|章、学|华、开|国、天|诗」并列保留。</li>
+<li><b>通公本人</b>不是坚公 124 世,而是坚公 105 世(入琼第 1 世)。我之前也说错了。</li>
+</ol>
+<p><b>你家的结论不变</b>:廷 = 坚公 132 = 入琼 28;日 = 133 = 29;方 = 134 = 30;子辈「升」= 135 = 31。</p>
+<h3>仍需对照原谱的存疑字</h3>
+<p><span class="tag">适</span><span class="tag">奕</span><span class="tag">殷</span><span class="tag">嗣</span><span class="tag">骏</span><span class="tag">鸿</span><span class="tag">猷</span><span class="tag">苗</span><span class="tag">禄</span> 以及裕公第 23 世括号写法、奇昌公「4 代」与表内数法的矛盾。</p>
+
+<h2>六、在家谱应用里使用</h2>
+<p>应用在「⋯ 菜单 → 辈分字谱(派字)」里提供 6 份预设(与本页数据相同):白延、溪西、观定、裕公、肖山公、奇昌公。步骤:<b>选预设 → 选一个人当锚点 → 填他是坚公第几世 → 保存</b>。之后每个人的详情面板会显示「派字「方」✓ / 坚公第 134 世 · 入琼第 30 世」。</p>
+</main>
+<script src="paizi-ref.js"></script></body></html>

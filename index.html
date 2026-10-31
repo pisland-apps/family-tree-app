@@ -1066,6 +1066,7 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
         <button role="menuitem" class="mi-phone" data-proxy="compactBtn">◉ 切换紧凑视图</button>
         <button role="menuitem" class="mi-mid" data-proxy="mapBtn">🗺 地图</button>
         <button role="menuitem" data-proxy="paiziOpenBtn">字 辈分字谱（派字）</button>
+        <button role="menuitem" data-proxy="paiziRefBtn">📜 林氏宗支派序对照表</button>
         <button role="menuitem" data-proxy="helpBtn">❓ 使用说明</button>
         <button role="menuitem" class="mi-phone" data-proxy="lockNowBtn">🔒 立即锁定</button>
         <button role="menuitem" class="mi-phone" data-proxy="changePasscodeBtn">🔑 更改密码</button>
@@ -1073,6 +1074,7 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
         <button role="menuitem" class="mi-io" data-proxy="importBtn">⬆ 导入</button>
       </div>
     </div>
+    <button type="button" id="paiziRefBtn" style="display:none" aria-hidden="true" tabindex="-1"></button>
     <button type="button" id="paiziOpenBtn" style="display:none" aria-hidden="true" tabindex="-1"></button>
     <button class="btn btn-ghost" id="compactBtn" title="紧凑视图：圆形头像 + 婚姻连接点" aria-pressed="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="8" r="3"/><circle cx="17" cy="8" r="3"/><path d="M10 8h4"/><path d="M12 8v6M7 20v-3h10v3"/></svg>
@@ -1514,7 +1516,7 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
       <div class="field">
         <label>字序（从老到小；同一代有两种写法的用 | 连起来，例如 世|鲁）</label>
         <textarea id="paiziSeq" rows="4" placeholder="有 兆 昌 家 适 仁 …"></textarea>
-        <div style="margin-top:6px;"><button type="button" class="btn btn-ghost" id="paiziPreset" style="padding:3px 10px; font-size:12px;">填入白延派字序（林氏派序对照表那份）</button> <span class="hint" id="paiziSeqInfo"></span></div>
+        <div style="margin-top:6px;"><select id="paiziPreset" style="padding:3px 6px; font-size:12px;"><option value="">填入林氏派序对照表字序…</option></select> <span class="hint" id="paiziSeqInfo"></span></div>
       </div>
       <div class="field-row" style="display:flex; gap:10px;">
         <div class="field"><label>第一套世代编号</label><input type="text" id="paiziSys1" maxlength="6" placeholder="坚公"></div>

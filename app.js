@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.29';
+const APP_VERSION = 'v8.30';
 const APP_VERSION_DATE = '2026-10-31';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -3281,15 +3281,17 @@ document.getElementById('treeSelect').addEventListener('change', (e)=>switchTree
   }
   const close = ()=>ov.classList.remove('show');
   $('paiziOpenBtn').addEventListener('click', openPaizi);
+  $('paiziRefBtn').addEventListener('click', ()=>{ window.open('paizi-ref.html', '_blank'); });
   $('paiziClose').addEventListener('click', close); $('paiziCancel').addEventListener('click', close);
   ov.addEventListener('click', e=>{ if(e.target===ov) close(); });
   $('paiziSeq').addEventListener('input', ()=>refreshShi()); $('paiziStart1').addEventListener('input', ()=>refreshShi());
-  $('paiziPreset').addEventListener('click', ()=>{
-    const P0 = Paizi.PRESET_BAIYAN;
-    $('paiziLabel').value = P0.label; $('paiziSeq').value = P0.seq.join(' ');
-    $('paiziSys1').value = P0.sys1; $('paiziStart1').value = P0.start1; $('paiziSys2').value = P0.sys2; $('paiziStart2').value = P0.start2;
-    refreshShi();
-  });
+  (function(){ const sel = $('paiziPreset'); Paizi.PRESETS.forEach(p=>{ const o = document.createElement('option'); o.value = p.id; o.textContent = p.label + '（坚公 ' + p.start1 + ' 世起）'; sel.appendChild(o); });
+    sel.addEventListener('change', ()=>{
+      const P0 = Paizi.PRESETS.find(p=>p.id===sel.value); if(!P0) return;
+      $('paiziLabel').value = P0.label; $('paiziSeq').value = P0.seq.join(' ');
+      $('paiziSys1').value = P0.sys1; $('paiziStart1').value = P0.start1; $('paiziSys2').value = P0.sys2; $('paiziStart2').value = P0.start2;
+      sel.value = ''; refreshShi(); toast(P0.note);
+    }); })();
   $('paiziClear').addEventListener('click', ()=>{
     const t = trees.find(x=>x.id===currentTreeId); if(!t || !t.paizi){ close(); return; }
     if(!confirm('清除这棵家族树的辈分字谱设置？（不会动任何人的资料）')) return;

@@ -43,5 +43,12 @@ eq(P.compute(cyc, Object.assign({}, cfg, {anchorId:'a'})).size, 2, '环不卡死
 eq(P.sanitize({seq:['<b>']}), null, '非单字被拒'); eq(P.sanitize({seq:['甲','<b>','乙']}), null, '中间有脏项整份拒绝（不能悄悄错位）'); eq(P.sanitize({seq:new Array(201).fill('甲')}), null, '太长被拒'); eq(P.sanitize(null), null, 'null');
 const s = P.sanitize({seq:['甲','乙'], start1:-5, start2:3, sys2:'', anchorShi:'x', label:'x'.repeat(50)});
 eq([s.start1, s.start2, s.anchorShi, s.label.length], [1, null, null, 12], '范围和长度被收紧');
+// 6. 全部预设：能通过清洗，坚公世代对得上扫描件
+P.PRESETS.forEach(p=>eq(!!P.sanitize(p), true, '预设可用 '+p.id));
+const pr = id=>P.sanitize(P.PRESETS.find(p=>p.id===id));
+eq(P.charsAt(pr('guanding'),123), ['日'], '观定派 123 世「日」'); eq(P.charsAt(pr('guanding'),145), ['腾'], '观定派 145 世「腾」'); eq(P.charsAt(pr('guanding'),146), ['芳'], '观定派 146 世「芳」');
+eq(P.charsAt(pr('xixi'),141), ['宗'], '溪西 141 宗'); eq(P.charsAt(pr('xixi'),124), ['其','文'], '溪西 124 两写法');
+eq(P.charsAt(pr('yu'),122), ['赞'], '裕公 24 世 = 坚公 122'); eq(P.charsAt(pr('xiaoshan'),143), ['名'], '肖山公第 20 世「名」= 坚公 143'); eq(P.charsAt(pr('qichang'),138), ['华'], '奇昌公第 15 世「华」= 坚公 138');
+eq(P.PRESETS.find(p=>p.id==='xiaoshan').seq.length, 19, '肖山 2–20 世共 19 代'); eq(P.PRESETS.find(p=>p.id==='guanding').seq.length, 24, '观定 24 代');
 
 console.log(bad ? '失败 '+bad : '全部通过'); process.exitCode = bad ? 1 : 0;
