@@ -50,5 +50,5 @@ eq(P.charsAt(pr('guanding'),123), ['日'], '观定派 123 世「日」'); eq(P.c
 eq(P.charsAt(pr('xixi'),141), ['宗'], '溪西 141 宗'); eq(P.charsAt(pr('xixi'),124), ['其','文'], '溪西 124 两写法');
 eq(P.charsAt(pr('yu'),122), ['赞'], '裕公 24 世 = 坚公 122'); eq(P.charsAt(pr('xiaoshan'),143), ['名'], '肖山公第 20 世「名」= 坚公 143'); eq(P.charsAt(pr('qichang'),138), ['华'], '奇昌公第 15 世「华」= 坚公 138');
 eq(P.PRESETS.find(p=>p.id==='xiaoshan').seq.length, 19, '肖山 2–20 世共 19 代'); eq(P.PRESETS.find(p=>p.id==='guanding').seq.length, 24, '观定 24 代');
-
+eq(P.charsAt(cfg0,125), ['远'], '125 世「远」（家中口传五言诗）');
 console.log(bad ? '失败 '+bad : '全部通过'); process.exitCode = bad ? 1 : 0;
