@@ -128,7 +128,7 @@ function generic(P,a,b){
     const pf=rf+(allM(P.slice(1,a).concat(P.slice(a+1,a+b)))?'堂':'表');
     if(d===1){
       const paternal=sx(P[1],1,0);
-      if(!sx(last,1,0)) return {t:rf+(paternal?'表姑妈':'表姨妈')+lineage,k:'rpcousin'};
+      if(!sx(last,1,0)) return {t:rf+(paternal?pf.slice(-1)+'姑妈':'表姨妈')+lineage,k:'rpcousin'};   // v8.48: 父系全男线 → 堂姑妈
       if(!paternal) return {t:rf+'表舅'+lineage,k:'rpcousin'};
       return {t:ab(older(last,P[1]),pf+'伯',pf+'叔')+lineage,k:'rpcousin'};
     }
@@ -178,7 +178,7 @@ function blood(P, es){
   }
   if(a===3&&b===2){ // 祖辈兄弟姐妹的子女：堂/表伯叔、表姑妈、表舅、表姨妈
     const p1=P[1], paternal=sx(p1,1,0);
-    if(!sx(last,1,0)) return {t:paternal?'表姑妈':'表姨妈',k:'pcousin'};
+    if(!sx(last,1,0)) return {t:paternal?((sx(P[2],1,0)&&sx(P[4],1,0))?'堂姑妈':'表姑妈'):'表姨妈',k:'pcousin'};   // v8.48: 祖父兄弟的女儿 = 堂姑妈
     if(!paternal) return {t:'表舅',k:'pcousin'};
     const pre=(sx(P[2],1,0)&&sx(P[4],1,0))?'堂':'表';
     return {t:ab(older(last,p1),pre+'伯',pre+'叔'),k:'pcousin'};
@@ -203,7 +203,7 @@ function blood(P, es){
   return generic(P,a,b);
 }
 const SPOUSE_OF = {'伯父':'伯母','叔叔':'婶婶','舅舅':'舅妈','姑妈':'姑丈','姨妈':'姨丈',
-  '堂伯':'堂伯母','堂叔':'堂婶','表伯':'表伯母','表叔':'表婶','表姑妈':'表姑丈','表舅':'表舅妈','表姨妈':'表姨丈',
+  '堂伯':'堂伯母','堂叔':'堂婶','表伯':'表伯母','表叔':'表婶','堂姑妈':'堂姑丈','表姑妈':'表姑丈','表舅':'表舅妈','表姨妈':'表姨丈',
   '伯祖父':'伯祖母','叔祖父':'叔祖母','姑奶奶':'姑爷','大姥爷':'大姥姥','小姥爷':'小姥姥','姑姥姥':'姑姥爷',
   '舅爷':'舅奶奶','舅姥爷':'舅姥姥','姨奶奶':'姨爷','姨姥姥':'姨姥爷'};
 

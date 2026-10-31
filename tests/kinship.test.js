@@ -38,7 +38,7 @@ add('gec','表叔','M',1962,['ge']); add('gecw','表婶','F',1963); wed('gec','g
 add('ws','妻妹','F',1993,['wf','wm']); add('wsh','连襟','M',1990); wed('ws','wsh');
 add('kw','儿媳','F',2021); wed('kid','kw'); add('kwf','亲家公','M',1990); by.kw.parents=['kwf'];
 const r5=K.compute(P,'me'); const g5=k=>r5.get(by[k].id).title;
-const exp5={gb:'伯祖父',gbw:'伯祖母',gbc:'堂伯',gbcw:'堂伯母',gbd:'表姑妈',gbdh:'表姑丈',gec:'表叔',gecw:'表婶',ws:'小姨子',wsh:'连襟',kw:'儿媳',kwf:'亲家公'};
+const exp5={gb:'伯祖父',gbw:'伯祖母',gbc:'堂伯',gbcw:'堂伯母',gbd:'堂姑妈',gbdh:'堂姑丈',gec:'表叔',gecw:'表婶',ws:'小姨子',wsh:'连襟',kw:'儿媳',kwf:'亲家公'};
 for(const q in exp5) if(g5(q)!==exp5[q]){ console.log('✗',q,exp5[q],g5(q)); bad++; }
 const r6=K.compute(P,'wi'); const g6=k=>r6.get(by[k].id).title; console.log('妻子视角 嫂嫂/大伯子:',g6('brw'),g6('br'));
 if(g6('brw')!=='妯娌'||g6('br')!=='大伯子') bad++;
