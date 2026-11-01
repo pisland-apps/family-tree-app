@@ -16,9 +16,26 @@ for(let i=0;i<L.nodes.length;i++) for(let j=i+1;j<L.nodes.length;j++){
 }
 if(worst < 0.9) fail('人物重叠 '+worst.toFixed(2));
 const ids = new Set(L.nodes.map(n=>n.id));
-L.edges.forEach(e=>{ if(!ids.has(e.a) || !ids.has(e.b)) fail('边连到不存在的人'); });
+L.edges.forEach(e=>{ if(!ids.has(e.a) || !ids.has(e.b) || (e.pb && !ids.has(e.pb))) fail('边连到不存在的人'); });
 if(!L.nodes.find(n=>n.me)) fail('缺「我」');
 if(!L.edges.some(e=>e.type==='sp') || !L.edges.some(e=>e.type==='bio')) fail('应有夫妻边和亲生边');
+if(!L.edges.some(e=>e.kind==='hub')) fail('夫妻同为父母时应合成 hub 线');
+// 同一个孩子不能既有 hub 线又有重复的单亲线
+L.edges.filter(e=>e.kind==='hub').forEach(h=>{ if(L.edges.some(e=>e.kind==='pc' && e.b===h.b && (e.a===h.pa || e.a===h.pb) && e.type===h.type)) fail('hub 和单线重复 '+h.b); });
+// 排版质量：线交叉、线穿过不相干的人都要少（v8.50 是 55 / 34，v8.51 是 7 / 2）
+{
+  const N = new Map(L.nodes.map(n=>[n.id,n]));
+  const segs = L.edges.map(e=> e.kind==='hub'
+    ? {x1:(N.get(e.pa).x+N.get(e.pb).x)/2, y1:(N.get(e.pa).y+N.get(e.pb).y)/2, x2:N.get(e.b).x, y2:N.get(e.b).y, ex:[e.pa,e.pb,e.b]}
+    : {x1:N.get(e.a).x, y1:N.get(e.a).y, x2:N.get(e.b).x, y2:N.get(e.b).y, ex:[e.a,e.b]});
+  const ccw=(ax,ay,bx,by,cx,cy)=>(cy-ay)*(bx-ax)>(by-ay)*(cx-ax);
+  const cross=(s,u)=>ccw(s.x1,s.y1,u.x1,u.y1,u.x2,u.y2)!==ccw(s.x2,s.y2,u.x1,u.y1,u.x2,u.y2) && ccw(s.x1,s.y1,s.x2,s.y2,u.x1,u.y1)!==ccw(s.x1,s.y1,s.x2,s.y2,u.x2,u.y2);
+  let x = 0, hit = 0;
+  for(let i=0;i<segs.length;i++) for(let j=i+1;j<segs.length;j++){ if(segs[i].ex.some(v=>segs[j].ex.includes(v))) continue; if(cross(segs[i],segs[j])) x++; }
+  segs.forEach(s=>{ const dx=s.x2-s.x1, dy=s.y2-s.y1, l2=dx*dx+dy*dy||1; L.nodes.forEach(n=>{ if(s.ex.includes(n.id)) return; const k=((n.x-s.x1)*dx+(n.y-s.y1)*dy)/l2; if(k<=0||k>=1) return; if(Math.hypot(n.x-(s.x1+k*dx), n.y-(s.y1+k*dy))<30) hit++; }); });
+  if(x > 20) fail('线交叉太多 '+x); if(hit > 8) fail('线穿过人物太多 '+hit);
+  console.log('交叉', x, '线穿人', hit);
+}
 console.log('乱家庭', L.shown, '人', L.edges.length, '条线', '最小间距比', worst.toFixed(2));
 
 // 2. 确定性：同样的数据排两次，坐标完全一样
@@ -50,13 +67,36 @@ try{
   const m3 = [mk('me','M',{parents:['f','m','x'],parentTypes:{x:'adopt', f:'bogus'}}), mk('f','M',{spouses:['m']}), mk('m','F',{spouses:['f']}), mk('x','F')];
   const r3 = run(m3,'me');
   if(r3.shown !== 4) fail('三位父母应都显示');
-  if(!r3.edges.some(e=>e.type==='adopt') || r3.edges.filter(e=>e.type==='bio').length !== 2) fail('养亲/未知类型处理不对');
+  if(!r3.edges.some(e=>e.type==='adopt' && e.kind==='pc')) fail('养亲应是单线');
+  const hb = r3.edges.filter(e=>e.kind==='hub'); if(hb.length !== 1 || hb[0].type!=='bio' || hb[0].label!=='子') fail('亲生父母（含未知类型回退亲生）应合成一条 hub');
+  // 两位父母不是夫妻 → 两条单线；类型不同的夫妻 → 也是两条单线
+  const sep = run([mk('me','M',{parents:['f','m']}), mk('f','M'), mk('m','F')], 'me', {hops:0});
+  if(sep.edges.some(e=>e.kind==='hub') || sep.edges.filter(e=>e.kind==='pc').length !== 2) fail('非夫妻父母不应合成 hub');
+  const mix = run([mk('me','F',{parents:['f','m'],parentTypes:{m:'step'}}), mk('f','M',{spouses:['m']}), mk('m','F',{spouses:['f']})], 'me', {hops:0});
+  if(mix.edges.some(e=>e.kind==='hub')) fail('类型不同不应合成 hub');
+  if(mix.edges.filter(e=>e.kind==='pc').length !== 2) fail('类型不同应保留两条单线');
   // 两个人叠在同一点也要能散开
   const same = [mk('me','M',{parents:['p1','p2']}), mk('p1','M'), mk('p2','F')];
   const rs = run(same,'me'); if(rs.nodes.some(n=>!isFinite(n.x))) fail('同点 NaN');
 }catch(e){ fail('抛错 '+e.stack); }
 
-// 6. 名字里的 HTML 必须被转义；隐藏某类线后路径变少
+// 6. 选中某人：无关的人变淡、无关的线变淡、只显示相关的关系名
+{
+  const pp = [mk('g','M'), mk('me','M',{parents:['f','m']}), mk('f','M',{spouses:['m'],parents:['g']}), mk('m','F',{spouses:['f']}), mk('o','M',{parents:['g']}), mk('c','F',{parents:['o']})];
+  const Ls = run(pp, 'me', {hops:0});
+  const ctx0 = {escapeHtml:s=>String(s), personById:id=>pp.find(p=>p.id===id), photoSrc:()=>null, surnameChar:n=>n[0], isDeceased:()=>false, chain:()=>'', subtitle:''};
+  const plain = T.renderNetHtml(Ls, ctx0, {labels:false});
+  if(/kn-node[^"]* dim/.test(plain) || /kn-el/.test(plain)) fail('没选人时不该有变淡/关系名');
+  const h = T.renderNetHtml(Ls, ctx0, {labels:false, sel:'f'});
+  if(!/kn-node g-m sel/.test(h) && !/class="kn-node[^"]*\bsel\b/.test(h)) fail('选中的人应有 sel');
+  if(!/kn-node[^"]* dim/.test(h)) fail('无关的人应变淡');
+  if(!/kn-el/.test(h)) fail('选中后应显示相关关系名（即使开关关着）');
+  if(!/stroke-opacity="0.12"/.test(h)) fail('无关的线应变淡');
+  if(T.renderNetHtml(Ls, ctx0, {sel:'不存在的id'}).includes(' dim')) fail('选中不存在的人应忽略');
+  const nb = T.netNeighbors ? T.netNeighbors(Ls,'f') : null; if(nb && (!nb.has('m') || !nb.has('me') || nb.has('o'))) fail('邻居集合不对');
+}
+
+// 7. 名字里的 HTML 必须被转义；隐藏某类线后路径变少
 const ps = [mk('me','M',{parents:['f']}), mk('f','M',{name:'<img src=x onerror=alert(1)>', spouses:['w']}), mk('w','F',{spouses:['f']})];
 const esc = s=>String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ctx = {escapeHtml:esc, personById:id=>ps.find(p=>p.id===id), photoSrc:()=>null, surnameChar:n=>esc(Array.from(n)[0]), isDeceased:()=>false, chain:()=>'', subtitle:''};

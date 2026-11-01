@@ -281,7 +281,8 @@ function renderHtml(L, ctx){
 /* ---------- v8.50 关系图（网络图）----------
    只用家谱里已有的数据：父母→子女（亲生 / 继 / 养 / 干，来自 person.parentTypes）和夫妻，不新增任何资料字段。
    人物范围和树状一致（kinMap 里有称谓的人）。布局是确定性的力导向：同一份数据每次排出来都一样，
-   「我」固定在中央，长辈整体偏上、晚辈偏下（弱引力），再做一轮防重叠。 */
+   「我」固定在中央，长辈整体偏上、晚辈偏下（弱引力），再做防重叠、让线绕开不相干的人。
+   v8.51：夫妻双方都是某个孩子的（同类型）父母时，画成「夫妻线中点 → 孩子」一条线（hub），不再是两条长箭头。 */
 const NET_TYPE = {
   bio:  {c:'#6b8f4e', n:'亲生'},
   sp:   {c:'#d0463c', n:'夫妻'},
@@ -339,9 +340,30 @@ function networkLayout(people, kinMap, viewerId, opts){
   const hops = (opts.hops==null) ? (ids.length<=36 ? 0 : 2) : opts.hops;      // 0 = 全部；人少就默认全显示
   const vis = ids.filter(id=> hops===0 || (hop.has(id) && hop.get(id)<=hops));
   const visSet = new Set(vis);
-  const edges = all.filter(e=>visSet.has(e.a) && visSet.has(e.b));
+  const single = all.filter(e=>visSet.has(e.a) && visSet.has(e.b));
+  /* v8.51: 夫妻同为某孩子的同类型父母 → 合成一条「夫妻中点 → 孩子」的 hub 线 */
+  const spPair = new Set(single.filter(e=>e.kind==='sp').map(e=>e.a+'|'+e.b));
+  const isCouple = (x,y)=> spPair.has(x<y ? x+'|'+y : y+'|'+x);
+  const byChild = new Map();
+  single.forEach(e=>{ if(e.kind!=='pc') return; if(!byChild.has(e.b)) byChild.set(e.b,[]); byChild.get(e.b).push(e); });
+  const merged = new Set(), hubs = [];
+  byChild.forEach((list,child)=>{
+    const used = new Set();
+    for(let i=0;i<list.length;i++){
+      if(used.has(i)) continue;
+      for(let j=i+1;j<list.length;j++){
+        if(used.has(j) || list[i].type!==list[j].type || !isCouple(list[i].a, list[j].a)) continue;
+        used.add(i); used.add(j);
+        const t = list[i].type, cg = info.get(child).p.gender, pre = ({step:'继', adopt:'养', god:'干'})[t] || '';
+        hubs.push({a:list[i].a, b:child, pa:list[i].a, pb:list[j].a, type:t, kind:'hub', label: pre + (cg==='M' ? '子' : cg==='F' ? '女' : '子女')});
+        merged.add(list[i]); merged.add(list[j]);
+        break;
+      }
+    }
+  });
+  const edges = single.filter(e=>!merged.has(e)).concat(hubs);
   const grp = new Map();                                                       // 同一对人之间有多条边（如配偶同时是父母）：错开成弧线
-  edges.forEach(e=>{ const k = e.a<e.b ? e.a+'|'+e.b : e.b+'|'+e.a; if(!grp.has(k)) grp.set(k,[]); grp.get(k).push(e); });
+  edges.forEach(e=>{ if(e.kind==='hub') return; const k = e.a<e.b ? e.a+'|'+e.b : e.b+'|'+e.a; if(!grp.has(k)) grp.set(k,[]); grp.get(k).push(e); });
   grp.forEach(list=>{ if(list.length>1) list.forEach((e,i)=>{ e.off = (i-(list.length-1)/2)*28 * (e.a<e.b ? 1 : -1); }); });
 
   /* 3. 初始位置：按步数分环，同一环里按各自「上一步」的角度排，亲人起步就挨着 */
@@ -362,7 +384,16 @@ function networkLayout(people, kinMap, viewerId, opts){
   });
 
   /* 4. 力导向（确定性：没有随机数） */
-  const E = edges.map(e=>[idx.get(e.a), idx.get(e.b), e.type==='sp' ? 105 : 150]);
+  const E = [], H = [], S = [];                     // E 弹簧 [a,b,长度,力度]；H 孩子靠近父母中点；S 线段（让别的人绕开）
+  edges.forEach(e=>{
+    if(e.kind==='hub'){
+      const c = idx.get(e.b), p = idx.get(e.pa), q = idx.get(e.pb);
+      E.push([c,p,150,0.05],[c,q,150,0.05]); H.push([c,p,q]); S.push({h:true, c, p, q, a:-1, b:-1});
+    }else{
+      const a = idx.get(e.a), b = idx.get(e.b);
+      E.push([a,b, e.type==='sp' ? 95 : 150, e.type==='sp' ? 0.09 : 0.05]); S.push({h:false, a, b, c:-1, p:-1, q:-1});
+    }
+  });
   const gen = vis.map(id=>info.get(id).gen);
   const jit = (i,j)=>[((i*7+j*3)%5)-2 || 1, ((i*3+j*7)%5)-2 || 1];
   const collide = ()=>{
@@ -379,6 +410,23 @@ function networkLayout(people, kinMap, viewerId, opts){
       else { X[i] += ux*push; Y[i] += uy*push; X[j] -= ux*push; Y[j] -= uy*push; }
     }
   };
+  const AV = 36;                                    // 线离不相干的人至少这么远
+  const avoid = ()=>{
+    for(const s of S){
+      let x1, y1, x2, y2;
+      if(s.h){ x1 = (X[s.p]+X[s.q])/2; y1 = (Y[s.p]+Y[s.q])/2; x2 = X[s.c]; y2 = Y[s.c]; }
+      else { x1 = X[s.a]; y1 = Y[s.a]; x2 = X[s.b]; y2 = Y[s.b]; }
+      const dx = x2-x1, dy = y2-y1, l2 = dx*dx+dy*dy; if(l2<1) continue;
+      const l = Math.sqrt(l2);
+      for(let k=0;k<n;k++){
+        if(k===vi || k===s.a || k===s.b || k===s.c || k===s.p || k===s.q) continue;
+        const t = ((X[k]-x1)*dx + (Y[k]-y1)*dy)/l2; if(t<=0.04 || t>=0.96) continue;
+        const ddx = X[k]-(x1+t*dx), ddy = Y[k]-(y1+t*dy), d = Math.hypot(ddx,ddy); if(d>=AV) continue;
+        const ux = d<1e-6 ? -dy/l : ddx/d, uy = d<1e-6 ? dx/l : ddy/d, push = (AV-d)*0.35;
+        X[k] += ux*push; Y[k] += uy*push;
+      }
+    }
+  };
   const ITER = 420;
   for(let it=0; it<ITER; it++){
     const alpha = Math.max(0.04, 1 - it/ITER);
@@ -389,9 +437,13 @@ function networkLayout(people, kinMap, viewerId, opts){
       const d = Math.sqrt(d2), f = 30000/d2*alpha, fx = dx/d*f, fy = dy/d*f;
       VX[i] += fx; VY[i] += fy; VX[j] -= fx; VY[j] -= fy;
     }
-    E.forEach(([a,b,L])=>{
-      const dx = X[b]-X[a], dy = Y[b]-Y[a], d = Math.hypot(dx,dy) || 1, f = (d-L)*0.05, fx = dx/d*f, fy = dy/d*f;
+    E.forEach(([a,b,L,k])=>{
+      const dx = X[b]-X[a], dy = Y[b]-Y[a], d = Math.hypot(dx,dy) || 1, f = (d-L)*k, fx = dx/d*f, fy = dy/d*f;
       VX[a] += fx; VY[a] += fy; VX[b] -= fx; VY[b] -= fy;
+    });
+    H.forEach(([c,p,q])=>{                           // 孩子往父母中点的正下方靠，线就不会斜得很远
+      const gx = (X[p]+X[q])/2 - X[c];
+      VX[c] += gx*0.03; VX[p] -= gx*0.015; VX[q] -= gx*0.015;
     });
     for(let i=0;i<n;i++){ VY[i] += (gen[i]*120 - Y[i])*0.01; VX[i] -= X[i]*0.004; }
     for(let i=0;i<n;i++){
@@ -399,9 +451,9 @@ function networkLayout(people, kinMap, viewerId, opts){
       VX[i] *= 0.78; VY[i] *= 0.78;
       X[i] += Math.max(-35, Math.min(35, VX[i])); Y[i] += Math.max(-35, Math.min(35, VY[i]));
     }
-    if(it>ITER*0.5) collide();
+    if(it>ITER*0.4){ avoid(); collide(); }
   }
-  for(let k=0;k<150;k++) collide();
+  for(let k=0;k<150;k++){ avoid(); collide(); }
 
   /* 5. 平移到画布里，留出上面的标题和图例 */
   const PADL = 44, PADR = 44, TOPPAD = 96, PADB = 44;
@@ -424,8 +476,12 @@ function networkLayout(people, kinMap, viewerId, opts){
 function netEdgeGeoms(L){
   const m = new Map(L.nodes.map(n=>[n.id,n])), f = v=>Math.round(v*10)/10;
   return L.edges.map(e=>{
-    const A = m.get(e.a), B = m.get(e.b); if(!A || !B) return null;
-    const ra = A.me ? 30 : 23, rb = B.me ? 30 : 23;
+    let A = m.get(e.a), B = m.get(e.b), ra;
+    if(e.kind==='hub'){                              // 起点 = 夫妻两人连线的中点
+      const P = m.get(e.pa), Q = m.get(e.pb); if(!P || !Q || !B) return null;
+      A = {x:(P.x+Q.x)/2, y:(P.y+Q.y)/2, me:false}; ra = -2;
+    }else{ if(!A || !B) return null; ra = A.me ? 30 : 23; }
+    const rb = B.me ? 30 : 23;
     const dx = B.x-A.x, dy = B.y-A.y, len = Math.hypot(dx,dy) || 1, off = e.off || 0;
     const cx = (A.x+B.x)/2 - dy/len*off*2, cy = (A.y+B.y)/2 + dx/len*off*2;     // 控制点（无偏移时就是中点）
     const unit = (px,py,tx,ty)=>{ const l = Math.hypot(tx-px,ty-py) || 1; return [(tx-px)/l, (ty-py)/l]; };
@@ -434,28 +490,42 @@ function netEdgeGeoms(L){
     const d = off ? `M${f(sx)},${f(sy)}Q${f(cx)},${f(cy)} ${f(ex)},${f(ey)}` : `M${f(sx)},${f(sy)}L${f(ex)},${f(ey)}`;
     const lx = off ? sx*0.25+cx*0.5+ex*0.25 : (sx+ex)/2, ly = off ? sy*0.25+cy*0.5+ey*0.25 : (sy+ey)/2;
     let head = '';
-    if(e.kind==='pc'){                                                           // 箭头：父母 → 子女
+    if(e.kind==='pc' || e.kind==='hub'){                                         // 箭头：父母 → 子女
       const t = unit(cx,cy,ex,ey), bx = ex-t[0]*10, by = ey-t[1]*10, px = -t[1]*4.5, py = t[0]*4.5;
       head = `${f(ex)},${f(ey)} ${f(bx+px)},${f(by+py)} ${f(bx-px)},${f(by-py)}`;
     }
     return {d, head, lx, ly};
   });
 }
-function netLinesHtml(L, hide){
-  const G = netEdgeGeoms(L), out = [];
+/* 选中某人后：和 TA 有关的线保持原样，其余变淡；hub 线算「夫妻两人 + 孩子」都相关 */
+function netTouch(e, sel){ return e.kind==='hub' ? (sel===e.pa || sel===e.pb || sel===e.b) : (sel===e.a || sel===e.b); }
+function netNeighbors(L, sel){
+  const s = new Set([sel]);
+  L.edges.forEach(e=>{ if(netTouch(e, sel)){ s.add(e.a); s.add(e.b); if(e.pb) s.add(e.pb); } });
+  return s;
+}
+function netLinesHtml(L, hide, sel){
+  const G = netEdgeGeoms(L), out = [], hubs = new Map(), m = new Map(L.nodes.map(n=>[n.id,n]));
   L.edges.forEach((e,i)=>{
     const g = G[i]; if(!g || (hide && hide.has(e.type))) return;
-    const c = NET_TYPE[e.type].c;
-    out.push(`<path d="${g.d}" fill="none" stroke="${c}" stroke-width="${e.kind==='sp' ? 2.4 : 1.8}" stroke-linecap="round" stroke-opacity=".9"/>`);
-    if(g.head) out.push(`<polygon points="${g.head}" fill="${c}"/>`);
+    const c = NET_TYPE[e.type].c, on = !sel || netTouch(e, sel);
+    out.push(`<path d="${g.d}" fill="none" stroke="${c}" stroke-width="${(e.kind==='sp' ? 3 : 1.8) + (sel && on ? 0.7 : 0)}" stroke-linecap="round" stroke-opacity="${on ? (sel ? 1 : .9) : .12}"/>`);
+    if(g.head) out.push(`<polygon points="${g.head}" fill="${c}" fill-opacity="${on ? 1 : .12}"/>`);
+    if(e.kind==='hub'){
+      const k = e.pa < e.pb ? e.pa+'|'+e.pb : e.pb+'|'+e.pa, P = m.get(e.pa), Q = m.get(e.pb);
+      if(!hubs.has(k)) hubs.set(k, {x:(P.x+Q.x)/2, y:(P.y+Q.y)/2, on:false});
+      if(on) hubs.get(k).on = true;
+    }
   });
+  hubs.forEach(h=>out.push(`<circle cx="${Math.round(h.x*10)/10}" cy="${Math.round(h.y*10)/10}" r="3.8" fill="${NET_TYPE.sp.c}" fill-opacity="${h.on ? 1 : .12}"/>`));
   return out.join('');
 }
-function netLabelsHtml(L, hide, on, esc){
-  if(!on) return '';
+function netLabelsHtml(L, hide, on, esc, sel){
+  if(!on && !sel) return '';
   const G = netEdgeGeoms(L), out = [];
   L.edges.forEach((e,i)=>{
     const g = G[i]; if(!g || (hide && hide.has(e.type))) return;
+    if(sel ? !netTouch(e, sel) : !on) return;       // 选中了人：只显示和 TA 有关的关系名，不管「关系名」开关
     const w = Math.round(Array.from(e.label).length*10.5 + 8);
     out.push(`<span class="kn-el" style="left:${Math.round(g.lx-w/2)}px;top:${Math.round(g.ly-7)}px;width:${w}px;color:${NET_TYPE[e.type].c}">${esc(e.label)}</span>`);
   });
@@ -464,16 +534,17 @@ function netLabelsHtml(L, hide, on, esc){
 function renderNetHtml(L, ctx, opts){
   opts = opts || {};
   const esc = ctx.escapeHtml, hide = opts.hide || new Set();
+  const sel = (opts.sel && L.nodes.some(n=>n.id===opts.sel)) ? opts.sel : null, nb = sel ? netNeighbors(L, sel) : null;
   const parts = [`<div class="kt-stage" style="width:${L.width}px;height:${L.height}px">`];
-  parts.push(`<svg class="kt-lines" width="${L.width}" height="${L.height}" viewBox="0 0 ${L.width} ${L.height}" aria-hidden="true">${netLinesHtml(L, hide)}</svg>`);
-  parts.push(`<div class="kn-labels">${netLabelsHtml(L, hide, opts.labels, esc)}</div>`);
+  parts.push(`<svg class="kt-lines" width="${L.width}" height="${L.height}" viewBox="0 0 ${L.width} ${L.height}" aria-hidden="true">${netLinesHtml(L, hide, sel)}</svg>`);
+  parts.push(`<div class="kn-labels">${netLabelsHtml(L, hide, opts.labels, esc, sel)}</div>`);
   parts.push(`<div class="kt-title"><b>亲戚关系图</b><span>${esc(ctx.subtitle||'')}</span></div>`);
   parts.push(`<div class="kn-lg">${L.types.filter(t=>!hide.has(t)).map(t=>`<span><i style="background:${NET_TYPE[t].c}"></i>${NET_TYPE[t].n}</span>`).join('')}</div>`);
   L.nodes.forEach(n=>{
     const p = ctx.personById(n.id); if(!p) return;
     const g = p.gender==='F' ? 'f' : p.gender==='M' ? 'm' : 'o', av = n.me ? 60 : 46;
     const src = ctx.photoSrc(p), inner = src ? `<img src="${esc(src)}" alt="">` : ctx.surnameChar(p.name);
-    const cls = 'kn-node g-' + g + (n.me ? ' me' : '') + (ctx.isDeceased(p) ? ' dead' : '');
+    const cls = 'kn-node g-' + g + (n.me ? ' me' : '') + (ctx.isDeceased(p) ? ' dead' : '') + (sel && n.id===sel ? ' sel' : '') + (sel && !nb.has(n.id) ? ' dim' : '');
     parts.push(`<div class="${cls}" data-id="${esc(n.id)}" title="${esc(ctx.chain(n.id))}" style="left:${n.x-NET_NW/2}px;top:${n.y-av/2}px;width:${NET_NW}px"><div class="kn-av" style="width:${av}px;height:${av}px">${inner}</div><b class="kn-t">${esc(n.title)}</b><span class="kn-n">${esc(p.name||'')}</span></div>`);
   });
   parts.push('</div>');
@@ -488,7 +559,7 @@ function show(ov, env){
   const SCALES = [0.5, 0.65, 0.8, 1, 1.25, 1.5];
   const esc = env.ctx.escapeHtml;
   // 关系图的临时状态（只在这次打开期间有效，不存盘；拖动后的位置也只保留到关闭）
-  const net = {hops:null, labels:null, hide:new Set(), L:null, key:null};
+  const net = {hops:null, labels:null, hide:new Set(), L:null, key:null, sel:null};
   let drag = null, suppress = false;
 
   function netLayoutNow(st){
@@ -516,16 +587,18 @@ function show(ov, env){
     }else if(view==='net'){
       const L = netLayoutNow(st);
       if(net.labels==null) net.labels = L.edges.length<=40;      // 边太多时默认先不显示文字，免得糊成一团
+      if(net.sel && !L.nodes.some(n=>n.id===net.sel)) net.sel = null;
+      const selNode = net.sel ? L.nodes.find(n=>n.id===net.sel) : null, selP = selNode ? env.ctx.personById(net.sel) : null;
       const ctx = Object.assign({}, env.ctx, {
         chain: id=>((st.kinMap.get(id)||{}).chain)||'',
         subtitle: '以「'+st.viewerName+'」为我 · '+st.dname
       });
       const chips = NET_ORDER.filter(t=>L.types.includes(t)).map(t=>`<button type="button" class="kn-chip${net.hide.has(t)?' off':''}" data-knt="${t}" title="显示 / 隐藏这类线"><i style="background:${NET_TYPE[t].c}"></i>${NET_TYPE[t].n}</button>`).join('');
-      const bar = `<div class="kn-bar">${chips}<button type="button" class="kn-chip${net.labels?'':' off'}" data-kno="labels" title="线上的关系文字">关系名</button><button type="button" class="kn-chip" data-kno="hops" title="只显示离「我」几步以内的人">范围：${L.hops===0?'全部':L.hops+'步内'}</button></div>`;
+      const bar = `<div class="kn-bar">${chips}<button type="button" class="kn-chip${net.labels?'':' off'}" data-kno="labels" title="线上的关系文字">关系名</button><button type="button" class="kn-chip" data-kno="hops" title="只显示离「我」几步以内的人">范围：${L.hops===0?'全部':L.hops+'步内'}</button>${selNode && selP ? `<span class="kn-selinfo">已选 <b>${esc(selNode.title)}</b> ${esc(selP.name||'')}<button type="button" class="kc-tool" data-kno="go">跳到 TA</button><button type="button" class="kc-tool" data-kno="clear">取消</button></span>` : ''}</div>`;
       body = L.nodes.length
-        ? bar + `<div class="kt-wrap"><div class="kt-sizer" style="width:${Math.round(L.width*scale)}px;height:${Math.round(L.height*scale)}px">${renderNetHtml(L, ctx, {hide:net.hide, labels:net.labels})}</div></div>`
+        ? bar + `<div class="kt-wrap"><div class="kt-sizer" style="width:${Math.round(L.width*scale)}px;height:${Math.round(L.height*scale)}px">${renderNetHtml(L, ctx, {hide:net.hide, labels:net.labels, sel:net.sel})}</div></div>`
         : `<div class="kc-foot">没有可以显示的关系。</div>`;
-      const notes = [skipNote(L.skipped), L.hidden ? `另有 ${L.hidden} 位不在「${L.hops}步内」，点「范围」可以看更多。` : '', L.nodes.length ? '可以拖动人物挪位置，点一下人物跳到 TA。' : ''].filter(Boolean);
+      const notes = [skipNote(L.skipped), L.hidden ? `另有 ${L.hidden} 位不在「${L.hops}步内」，点「范围」可以看更多。` : '', L.nodes.length ? '点一下人物看 TA 的关系（再点一下取消），可拖动人物挪位置，「跳到 TA」回到家谱。' : ''].filter(Boolean);
       foot = notes.length ? `<div class="kc-foot">${notes.join(' ')}</div>` : '';
       tools = zoomTools;
     }else{
@@ -581,10 +654,15 @@ function show(ov, env){
 
   ov.onclick = e=>{
     const t = e.target.closest ? e.target.closest('[data-kcv],[data-kc],[data-knt],[data-kno],.kt-card,.kn-node,.kc-item,.kt-pill') : null;
-    if(!t || !ov.contains(t)) return;
+    if(!t || !ov.contains(t)){                                   // 点画布空白处：取消选中
+      if(net.sel && !suppress && e.target.closest && e.target.closest('.kt-wrap')){ net.sel = null; render(); }
+      return;
+    }
     if(t.dataset.kcv){ env.viewSet(t.dataset.kcv); render(); return; }
     if(t.dataset.knt){ const k = t.dataset.knt; if(net.hide.has(k)) net.hide.delete(k); else net.hide.add(k); render(); return; }
     if(t.dataset.kno==='labels'){ net.labels = !net.labels; render(); return; }
+    if(t.dataset.kno==='clear'){ net.sel = null; render(); return; }
+    if(t.dataset.kno==='go'){ const id = net.sel; if(id){ ov.style.display = 'none'; env.pick(id); } return; }
     if(t.dataset.kno==='hops'){
       const seq = [1,2,3,0], cur = net.L ? net.L.hops : 0;
       net.hops = seq[(seq.indexOf(cur)+1) % seq.length]; net.L = null; render(); return;
@@ -597,7 +675,10 @@ function show(ov, env){
     }
     if(act==='shot'){ shot(); return; }
     if(t.classList.contains('kt-pill')){ const k = t.dataset.pill; if(expanded.has(k)) expanded.delete(k); else expanded.add(k); render(); return; }
-    if(t.classList.contains('kn-node') && suppress) return;      // 刚拖完人物，别当成点击
+    if(t.classList.contains('kn-node')){                         // 关系图：点人物 = 选中 / 取消选中（不再直接跳走）
+      if(suppress) return;                                       // 刚拖完人物，别当成点击
+      net.sel = net.sel===t.dataset.id ? null : t.dataset.id; render(); return;
+    }
     const id = t.dataset.id;
     if(id){ ov.style.display = 'none'; env.pick(id); }
   };
@@ -620,8 +701,8 @@ function show(ov, env){
     n.y = Math.round(Math.max(100, Math.min(L.height-70, drag.oy + dy/scale)));
     drag.el.style.left = (n.x-NET_NW/2)+'px'; drag.el.style.top = (n.y-av/2)+'px';
     const svg = ov.querySelector('.kt-lines'), lab = ov.querySelector('.kn-labels');
-    if(svg) svg.innerHTML = netLinesHtml(L, net.hide);
-    if(lab) lab.innerHTML = netLabelsHtml(L, net.hide, net.labels, esc);
+    if(svg) svg.innerHTML = netLinesHtml(L, net.hide, net.sel);
+    if(lab) lab.innerHTML = netLabelsHtml(L, net.hide, net.labels, esc, net.sel);
   };
   const endDrag = e=>{
     if(!drag || (e && e.pointerId!==drag.pid)) return;
@@ -634,6 +715,6 @@ function show(ov, env){
   return {render, shot};
 }
 
-const api = {layout, renderHtml, networkLayout, renderNetHtml, netEdgeGeoms, pcLabel, show, BAND_LABEL, NET_TYPE, genLabel};
+const api = {layout, renderHtml, networkLayout, renderNetHtml, netEdgeGeoms, netNeighbors, pcLabel, show, BAND_LABEL, NET_TYPE, genLabel};
 if(typeof module!=='undefined' && module.exports) module.exports = api; else root.KinTree = api;
 })(typeof window!=='undefined' ? window : globalThis);
