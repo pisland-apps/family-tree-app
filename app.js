@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.55';
+const APP_VERSION = 'v8.57';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -300,6 +300,15 @@ let currentFocusSet = null; // recomputed each render() from the above
 function uid(){ return 'p_' + Math.random().toString(36).slice(2,10); }
 
 function personById(id){ return people.find(p=>p.id===id); }
+// v8.56: 同胞线（父母不详的兄弟姐妹）。记在 person.siblings 上（双向）。
+// 两人已有共同父母时，兄弟关系由父母体现，同胞线不再生效（不重复画）。
+function sameParents(a, b){ return (a.parents||[]).some(x=>(b.parents||[]).includes(x)); }
+function siblingLinksOf(p, onlyVisible=true){
+  return (p.siblings||[]).filter(sid=>{
+    const s = personById(sid);
+    return s && sid!==p.id && !sameParents(p, s) && (!onlyVisible || isVisible(sid));
+  });
+}
 function childrenOf(id){
   return people.filter(p => p.parents && p.parents.includes(id));
 }
@@ -639,6 +648,27 @@ function collectSiblingsAndDescendants(id, depthDown, set){
       }
     });
   });
+  // v8.56: 用同胞线连着的兄弟姐妹也算「旁支」
+  siblingLinksOf(p, false).forEach(sid=>{
+    if(set.has(sid)) return;
+    set.add(sid);
+    const sp = personById(sid);
+    (sp.spouses||[]).forEach(x=>{ if(personById(x)) set.add(x); });
+    let frontier = [sid];
+    for(let g=0; g<depthDown && frontier.length; g++){
+      const next = [];
+      frontier.forEach(fid=>{
+        childrenOf(fid).forEach(c=>{
+          if(!set.has(c.id)){
+            set.add(c.id);
+            (c.spouses||[]).forEach(csid=>{ if(personById(csid)) set.add(csid); });
+            next.push(c.id);
+          }
+        });
+      });
+      frontier = next;
+    }
+  });
 }
 
 function computeFocusSet(){
@@ -898,6 +928,15 @@ function computeLevels(){
       });
     });
 
+    // Rule D (v8.56): 同胞线两端必须同代（和配偶同代一样，只往下取较大值）
+    visiblePeople().forEach(p=>{
+      siblingLinksOf(p).forEach(sid=>{
+        const m = Math.max(level[sid], level[p.id]);
+        if(level[p.id]!==m){ level[p.id]=m; changed=true; }
+        if(level[sid]!==m){ level[sid]=m; changed=true; }
+      });
+    });
+
     // Rule C: anyone with no ancestry of their own (in-laws) borrows a
     // generation from their children where that suggests they sit deeper
     // than the level-0 default.
@@ -930,13 +969,17 @@ function orderPeople(level){
     const bv = bh!==undefined ? bh : roots.indexOf(b)*10;
     return av-bv;
   });
-  roots.forEach(p=>{
-    if(placed.has(p.id)) return;
-    rows[0].push(p.id); placed.add(p.id);
-    (p.spouses||[]).filter(isVisible).forEach(sid=>{
-      if(!placed.has(sid) && level[sid]===0){ rows[0].push(sid); placed.add(sid); }
+  // v8.56: 放一个人 + 他的配偶 + 用同胞线连着的兄弟姐妹（及其配偶），让同胞紧挨着
+  function placeUnit(pid, row, lvl){
+    if(placed.has(pid)) return;
+    row.push(pid); placed.add(pid);
+    const pp = personById(pid);
+    (pp.spouses||[]).filter(isVisible).forEach(sid=>{
+      if(!placed.has(sid) && level[sid]===lvl){ row.push(sid); placed.add(sid); }
     });
-  });
+    siblingLinksOf(pp).forEach(sid=>{ if(!placed.has(sid) && level[sid]===lvl) placeUnit(sid, row, lvl); });
+  }
+  roots.forEach(p=> placeUnit(p.id, rows[0], 0));
   // any remaining unplaced roots (isolated)
   visible.filter(p=>level[p.id]===0 && !placed.has(p.id)).forEach(p=>{ rows[0].push(p.id); placed.add(p.id); });
 
@@ -971,16 +1014,10 @@ function orderPeople(level){
     };
     withAnchor.sort((x,y)=> (x.anchor-y.anchor) || (second(x)-second(y)));
 
-    withAnchor.forEach(({c})=>{
-      if(placed.has(c.id)) return;
-      rows[l+1].push(c.id); placed.add(c.id);
-      (c.spouses||[]).filter(isVisible).forEach(sid=>{
-        if(!placed.has(sid) && level[sid]===l+1){ rows[l+1].push(sid); placed.add(sid); }
-      });
-    });
+    withAnchor.forEach(({c})=> placeUnit(c.id, rows[l+1], l+1));
 
     // any unplaced at this level (no linked parent already placed) appended
-    visible.filter(p=>level[p.id]===l+1 && !placed.has(p.id)).forEach(p=>{ rows[l+1].push(p.id); placed.add(p.id); });
+    visible.filter(p=>level[p.id]===l+1 && !placed.has(p.id)).forEach(p=> placeUnit(p.id, rows[l+1], l+1));
   }
   return rows;
 }
@@ -1451,6 +1488,44 @@ function drawConnectors(){
       }
     });
   }
+
+  // v8.56: 同胞线（父母不详的兄弟姐妹）——同一组兄弟姐妹头上只画一条虚线横杆，
+  // 每人往下一小段竖线；和夫妻线（实线+圆点）区分开。A–B、A–C 相连时 B、C 自动算同一组。
+  (function drawSiblingGroups(){
+    const vis = visiblePeople();
+    const parent = {};
+    const find = x=>{ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+    vis.forEach(p=>{ parent[p.id]=p.id; });
+    const linked = new Set();
+    vis.forEach(p=>{
+      siblingLinksOf(p).forEach(sid=>{
+        if(parent[sid]===undefined) return;
+        linked.add(p.id); linked.add(sid);
+        parent[find(p.id)] = find(sid);
+      });
+    });
+    const groups = {};
+    linked.forEach(id=>{ (groups[find(id)] = groups[find(id)] || []).push(id); });
+    Object.values(groups).forEach(ids=>{
+      const rects = ids.map(id=>cardRect(id)).filter(Boolean).sort((a,b)=>a.cx-b.cx);
+      if(rects.length<2) return;
+      const topOf = c=> compact ? c.avTop : c.top;
+      const y = Math.min(...rects.map(topOf)) - 14;
+      // 最左的竖线靠右一点、最右的靠左一点、中间的居中，避开卡片正上方可能有的父母连线
+      const xs = rects.map((c,i)=> i===0 ? c.cx+16 : (i===rects.length-1 ? c.cx-16 : c.cx));
+      if(xs[xs.length-1] <= xs[0]) return;
+      let d = `M ${xs[0]} ${y} L ${xs[xs.length-1]} ${y}`;
+      rects.forEach((c,i)=>{ d += ` M ${xs[i]} ${y} L ${xs[i]} ${topOf(c)}`; });
+      const path = document.createElementNS(svgNS,'path');
+      path.setAttribute('d', d);
+      path.setAttribute('stroke', compact ? COMPACT_LINE : '#8B7355');
+      path.setAttribute('stroke-width', compact ? '3' : '2.5');
+      path.setAttribute('stroke-dasharray', '7 5');
+      path.setAttribute('stroke-linejoin','round');
+      path.setAttribute('fill','none');
+      svg.appendChild(path);
+    });
+  })();
 
   // parent-child connectors — collect first, draw after, so we can rank
   // lines feeding into the SAME target row by horizontal position and
@@ -2476,6 +2551,7 @@ function deletePerson(id){
   people.forEach(x=>{
     if(x.parents) x.parents = x.parents.filter(pid=>pid!==id);
     if(x.spouses) x.spouses = x.spouses.filter(sid=>sid!==id);
+    if(x.siblings) x.siblings = x.siblings.filter(sid=>sid!==id);
   });
   if(selectedId===id) selectedId=null;
   saveData();
@@ -2513,6 +2589,7 @@ function openModal(id, preset){
   modalParentTypes = {};
   populateMultiSelect('parentsSelect', people, [], 4);
   populateMultiSelect('spousesSelect', people, [], 99);
+  populateMultiSelect('siblingsSelect', people, [], 99);
 
   if(id){
     const p = personById(id);
@@ -2530,11 +2607,13 @@ function openModal(id, preset){
     modalParentTypes = Object.assign({}, p.parentTypes||{});
     populateMultiSelect('parentsSelect', people.filter(x=>x.id!==id), p.parents||[], 4);
     populateMultiSelect('spousesSelect', people.filter(x=>x.id!==id), p.spouses||[], 99);
+    populateMultiSelect('siblingsSelect', people.filter(x=>x.id!==id), p.siblings||[], 99);
   } else if(modalPreset.presetParent){
     populateMultiSelect('parentsSelect', people, [modalPreset.presetParent], 4);
   }
 
   renderParentTypes();
+  updateSiblingsHint();
   overlay.classList.add('show');
   document.getElementById('fName').focus();
 }
@@ -2590,6 +2669,21 @@ function populateMultiSelect(containerId, list, selectedIds, max){
   }
 }
 
+function updateSiblingsHint(){
+  const hint = document.getElementById('siblingsHint');
+  if(!hint) return;
+  const checked = id=>Array.from(document.querySelectorAll('#'+id+' input:checked')).map(i=>i.value);
+  const parentIds = checked('parentsSelect');
+  const dup = checked('siblingsSelect').map(personById).filter(x=>x && (x.parents||[]).some(pid=>parentIds.includes(pid)));
+  hint.textContent = dup.length
+    ? `「${dup.map(x=>x.name).join('、')}」与本人已有共同父母，兄弟关系已由父母体现，这条同胞线不会重复画出。`
+    : '';
+}
+['parentsSelect','siblingsSelect'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('change', updateSiblingsHint);
+});
+
 function quickAddPerson(name, containerId, max){
   name = name.trim();
   if(!name){ toast('请先输入姓名'); return; }
@@ -2643,6 +2737,7 @@ function saveModal(){
   const birthOrder = parseInt(document.getElementById('fOrder').value, 10) || undefined;
   const parentIds = Array.from(document.querySelectorAll('#parentsSelect input:checked')).map(i=>i.value);
   const spouseIds = Array.from(document.querySelectorAll('#spousesSelect input:checked')).map(i=>i.value);
+  const siblingIds = Array.from(document.querySelectorAll('#siblingsSelect input:checked')).map(i=>i.value);
 
   if(editingId){
     const p = personById(editingId);
@@ -2657,12 +2752,23 @@ function saveModal(){
       const sp = personById(sid);
       if(sp){ sp.spouses = sp.spouses||[]; if(!sp.spouses.includes(editingId)) sp.spouses.push(editingId); }
     });
+    // 同胞线：先清掉旧的双向链接，再按新选择重建
+    people.forEach(x=>{ if(x.siblings) x.siblings = x.siblings.filter(id=>id!==editingId); });
+    p.siblings = siblingIds;
+    siblingIds.forEach(sid=>{
+      const sb = personById(sid);
+      if(sb){ sb.siblings = sb.siblings||[]; if(!sb.siblings.includes(editingId)) sb.siblings.push(editingId); }
+    });
     saveData(); render(); renderSidePanel();
     toast('已更新 ' + name);
   } else {
     const newId = uid();
-    const newPerson = { id:newId, name, gender, birth, death, country, notes, birthOrder, photoId: modalPhotoId, parents: parentIds, parentTypes: collectParentTypes(parentIds), spouses: spouseIds, treeId: currentTreeId };
+    const newPerson = { id:newId, name, gender, birth, death, country, notes, birthOrder, photoId: modalPhotoId, parents: parentIds, parentTypes: collectParentTypes(parentIds), spouses: spouseIds, siblings: siblingIds, treeId: currentTreeId };
     people.push(newPerson);
+    siblingIds.forEach(sid=>{
+      const sb = personById(sid);
+      if(sb){ sb.siblings = sb.siblings||[]; if(!sb.siblings.includes(newId)) sb.siblings.push(newId); }
+    });
     spouseIds.forEach(sid=>{
       const sp = personById(sid);
       if(sp){ sp.spouses = sp.spouses||[]; if(!sp.spouses.includes(newId)) sp.spouses.push(newId); }
@@ -2964,6 +3070,7 @@ function validateAndNormalizePeople(rawPeople){
       photoId: importStr(raw.photoId) || undefined,
       parents: Array.isArray(raw.parents) ? raw.parents.filter(x=>typeof x==='string').slice(0, IMPORT_LIMITS.maxParentsPerPerson) : [],
       spouses: Array.isArray(raw.spouses) ? raw.spouses.filter(x=>typeof x==='string') : [],
+      siblings: Array.isArray(raw.siblings) ? raw.siblings.filter(x=>typeof x==='string').slice(0,50) : [],
       treeId: importStr(raw.treeId) || undefined,
       hidden: !!raw.hidden,
       collapsed: !!raw.collapsed,
@@ -2978,7 +3085,14 @@ function validateAndNormalizePeople(rawPeople){
   cleaned.forEach(p=>{
     p.parents = p.parents.filter(id=>validIds.has(id));
     p.spouses = p.spouses.filter(id=>validIds.has(id));
+    p.siblings = p.siblings.filter(id=>validIds.has(id) && id!==p.id);
   });
+  // 同胞线必须双向：A 记了 B，B 也要记 A
+  const byId = new Map(cleaned.map(p=>[p.id,p]));
+  cleaned.forEach(p=>{
+    p.siblings.forEach(sid=>{ const o = byId.get(sid); if(o && !o.siblings.includes(p.id)) o.siblings.push(p.id); });
+  });
+  cleaned.forEach(p=>{ if(!p.siblings.length) delete p.siblings; });
   return cleaned;
 }
 
