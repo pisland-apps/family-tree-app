@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.58';
+const APP_VERSION = 'v8.59';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -1043,9 +1043,38 @@ let kinDialect = 'mandarin';  // mandarin / hakka_sb
 let kinMode = 'both';         // both 名字+称谓 / name 只名字 / title 只称谓
 let kinMap = null;
 let lastCycleSig = '';
+// v8.59: 同胞线接入亲戚称谓。同一组用同胞线连着的兄弟姐妹，在「计算称谓时」临时给他们一位共同的
+// 虚拟父亲（只存在于这次计算里，不写进家谱数据、不显示在树上），这样哥/弟、伯/叔、堂/表兄弟、侄子
+// 等称谓都按真实有共同父母时的规则推算。已有共同父母的人不受影响。
+const SIB_VIRT = '__sib_';
+function kinPeopleWithSiblingLinks(){
+  const parent = {};
+  const find = x=>{ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  people.forEach(p=>{ parent[p.id]=p.id; });
+  const linked = new Set();
+  people.forEach(p=>{
+    siblingLinksOf(p, false).forEach(sid=>{
+      if(parent[sid]===undefined) return;
+      linked.add(p.id); linked.add(sid);
+      parent[find(p.id)] = find(sid);
+    });
+  });
+  if(!linked.size) return people;
+  const virt = {};
+  linked.forEach(id=>{ const r = find(id); if(!virt[r]) virt[r] = SIB_VIRT + r; });
+  const out = people.map(p=>{
+    if(!linked.has(p.id)) return p;
+    return Object.assign({}, p, {parents:[...(p.parents||[]), virt[find(p.id)]]});
+  });
+  Object.values(virt).forEach(vid=>{
+    out.push({id:vid, name:'（共同父母，不详）', gender:'M', birth:'', death:'', parents:[], spouses:[]});
+  });
+  return out;
+}
 function refreshKin(){
   if(viewerId && !personById(viewerId)) viewerId = null;
-  kinMap = (viewerId && window.Kinship) ? Kinship.compute(people, viewerId, {dialect: kinDialect, custom: kinCustom[kinDialect]||{}}) : null;
+  kinMap = (viewerId && window.Kinship) ? Kinship.compute(kinPeopleWithSiblingLinks(), viewerId, {dialect: kinDialect, custom: kinCustom[kinDialect]||{}}) : null;
+  if(kinMap) Array.from(kinMap.keys()).forEach(id=>{ if(id.startsWith(SIB_VIRT)) kinMap.delete(id); });   // 虚拟父亲不出现在结果里
   if(window.Kinship){
     const cyc = Kinship.detectCycles(people), sig = cyc.map(c=>c.join('>')).join(',');
     if(sig && sig!==lastCycleSig){
