@@ -1,4 +1,4 @@
-/* kintree.js — 亲戚图表「树状」视图的布局计算（纯函数，不碰 DOM，可在 node 里直接测试）
+/* kintree.js — 亲戚图表「树状」「关系图」两个视图的布局计算（关系图见下方 networkLayout，v8.50）（纯函数，不碰 DOM，可在 node 里直接测试）
    输入：people（家谱数据）、kinMap（Kinship.compute 的结果）、viewerId（「我」）
    输出：每张卡片/折叠钮的坐标、连线路径、列标题、区块标题。
 
@@ -278,19 +278,232 @@ function renderHtml(L, ctx){
   return parts.join('');
 }
 
-/* ---------- 弹窗界面：表格 / 树状 切换、缩放、折叠展开、存图 ----------
+/* ---------- v8.50 关系图（网络图）----------
+   只用家谱里已有的数据：父母→子女（亲生 / 继 / 养 / 干，来自 person.parentTypes）和夫妻，不新增任何资料字段。
+   人物范围和树状一致（kinMap 里有称谓的人）。布局是确定性的力导向：同一份数据每次排出来都一样，
+   「我」固定在中央，长辈整体偏上、晚辈偏下（弱引力），再做一轮防重叠。 */
+const NET_TYPE = {
+  bio:  {c:'#6b8f4e', n:'亲生'},
+  sp:   {c:'#d0463c', n:'夫妻'},
+  step: {c:'#4a84c8', n:'继亲'},
+  adopt:{c:'#e09a1f', n:'养亲'},
+  god:  {c:'#8b5cc4', n:'干亲'}
+};
+const NET_ORDER = ['bio','sp','step','adopt','god'];
+const NET_NW = 92, NET_NH = 78;          // 一个人（头像+称谓+名字）占的格子，防重叠用
+
+function pcLabel(pg, cg, type){
+  const pre = ({step:'继', adopt:'养', god:'干'})[type] || '';
+  if((pg!=='M' && pg!=='F') || (cg!=='M' && cg!=='F')) return pre + '亲子';
+  return pre + (pg==='M' ? '父' : '母') + (cg==='M' ? '子' : '女');
+}
+
+function networkLayout(people, kinMap, viewerId, opts){
+  opts = opts || {};
+  const byId = new Map(people.map(p=>[p.id,p]));
+  const info = new Map(); let skipped = 0;
+  if(kinMap) kinMap.forEach((k,id)=>{
+    const p = byId.get(id); if(!p) return;
+    if(!k.title && id!==viewerId){ skipped++; return; }
+    info.set(id, {p, gen:(k.place && k.place.gen) || 0, title:k.title || '我'});
+  });
+  const empty = {nodes:[], edges:[], types:[], width:0, height:0, skipped, shown:0, total:0, hidden:0, hops:0};
+  if(!info.has(viewerId)) return empty;
+  const ids = Array.from(info.keys());
+
+  /* 1. 边：父母→子女、夫妻（去重；父母是 a，子女是 b） */
+  const all = [], seen = new Set();
+  const pushE = (e,key)=>{ if(seen.has(key)) return; seen.add(key); all.push(e); };
+  ids.forEach(id=>{
+    const p = info.get(id).p;
+    (p.parents||[]).forEach(pid=>{
+      if(pid===id || !info.has(pid)) return;
+      const raw = (p.parentTypes||{})[pid], type = (raw==='step'||raw==='adopt'||raw==='god') ? raw : 'bio';
+      pushE({a:pid, b:id, type, kind:'pc', label:pcLabel(info.get(pid).p.gender, p.gender, type)}, 'c|'+pid+'|'+id);
+    });
+    (p.spouses||[]).forEach(sid=>{
+      if(sid===id || !info.has(sid)) return;
+      const a = id<sid ? id : sid, b = id<sid ? sid : id;
+      pushE({a, b, type:'sp', kind:'sp', label:'夫妻'}, 's|'+a+'|'+b);
+    });
+  });
+
+  /* 2. 离「我」几步（把边当无向图做广度优先），按范围截取 */
+  const adj = new Map(ids.map(i=>[i,[]]));
+  all.forEach(e=>{ adj.get(e.a).push(e.b); adj.get(e.b).push(e.a); });
+  const hop = new Map([[viewerId,0]]), par = new Map(), order = [viewerId];
+  for(let q=0;q<order.length;q++){
+    const u = order[q];
+    adj.get(u).forEach(v=>{ if(!hop.has(v)){ hop.set(v, hop.get(u)+1); par.set(v,u); order.push(v); } });
+  }
+  const hops = (opts.hops==null) ? (ids.length<=36 ? 0 : 2) : opts.hops;      // 0 = 全部；人少就默认全显示
+  const vis = ids.filter(id=> hops===0 || (hop.has(id) && hop.get(id)<=hops));
+  const visSet = new Set(vis);
+  const edges = all.filter(e=>visSet.has(e.a) && visSet.has(e.b));
+  const grp = new Map();                                                       // 同一对人之间有多条边（如配偶同时是父母）：错开成弧线
+  edges.forEach(e=>{ const k = e.a<e.b ? e.a+'|'+e.b : e.b+'|'+e.a; if(!grp.has(k)) grp.set(k,[]); grp.get(k).push(e); });
+  grp.forEach(list=>{ if(list.length>1) list.forEach((e,i)=>{ e.off = (i-(list.length-1)/2)*28 * (e.a<e.b ? 1 : -1); }); });
+
+  /* 3. 初始位置：按步数分环，同一环里按各自「上一步」的角度排，亲人起步就挨着 */
+  let maxHop = 0; hop.forEach(h=>{ if(h>maxHop) maxHop = h; });
+  const lvl = id=> hop.has(id) ? hop.get(id) : maxHop+1;
+  const idx = new Map(vis.map((id,i)=>[id,i]));
+  const n = vis.length, vi = idx.get(viewerId);
+  const X = new Float64Array(n), Y = new Float64Array(n), VX = new Float64Array(n), VY = new Float64Array(n);
+  const ang = new Map([[viewerId,0]]), levels = new Map();
+  vis.forEach(id=>{ if(id===viewerId) return; const l = lvl(id); if(!levels.has(l)) levels.set(l,[]); levels.get(l).push(id); });
+  Array.from(levels.keys()).sort((a,b)=>a-b).forEach(l=>{
+    const list = levels.get(l), pa = id=> ang.has(par.get(id)) ? ang.get(par.get(id)) : 0;
+    list.sort((a,b)=> (pa(a)-pa(b)) || (idx.get(a)-idx.get(b)));
+    list.forEach((id,i)=>{
+      const a = 2*Math.PI*(i+0.5)/list.length + l*0.5, r = l*170;
+      ang.set(id,a); X[idx.get(id)] = Math.cos(a)*r; Y[idx.get(id)] = Math.sin(a)*r;
+    });
+  });
+
+  /* 4. 力导向（确定性：没有随机数） */
+  const E = edges.map(e=>[idx.get(e.a), idx.get(e.b), e.type==='sp' ? 105 : 150]);
+  const gen = vis.map(id=>info.get(id).gen);
+  const jit = (i,j)=>[((i*7+j*3)%5)-2 || 1, ((i*3+j*7)%5)-2 || 1];
+  const collide = ()=>{
+    for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
+      let dx = X[i]-X[j], dy = Y[i]-Y[j];
+      if(Math.abs(dx)>=NET_NW || Math.abs(dy)>=NET_NH) continue;
+      let dist = Math.hypot(dx,dy);
+      if(dist<1e-6){ const t = jit(i,j); dx = t[0]; dy = t[1]; dist = Math.hypot(dx,dy); }
+      const ux = dx/dist, uy = dy/dist, need = 1/Math.hypot(ux/NET_NW, uy/NET_NH);
+      if(dist>=need) continue;
+      const push = (need-dist)*0.55;
+      if(i===vi){ X[j] -= ux*push*2; Y[j] -= uy*push*2; }
+      else if(j===vi){ X[i] += ux*push*2; Y[i] += uy*push*2; }
+      else { X[i] += ux*push; Y[i] += uy*push; X[j] -= ux*push; Y[j] -= uy*push; }
+    }
+  };
+  const ITER = 420;
+  for(let it=0; it<ITER; it++){
+    const alpha = Math.max(0.04, 1 - it/ITER);
+    for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
+      let dx = X[i]-X[j], dy = Y[i]-Y[j], d2 = dx*dx+dy*dy;
+      if(d2<1){ const t = jit(i,j); dx = t[0]; dy = t[1]; d2 = dx*dx+dy*dy; }
+      if(d2>360000) continue;
+      const d = Math.sqrt(d2), f = 30000/d2*alpha, fx = dx/d*f, fy = dy/d*f;
+      VX[i] += fx; VY[i] += fy; VX[j] -= fx; VY[j] -= fy;
+    }
+    E.forEach(([a,b,L])=>{
+      const dx = X[b]-X[a], dy = Y[b]-Y[a], d = Math.hypot(dx,dy) || 1, f = (d-L)*0.05, fx = dx/d*f, fy = dy/d*f;
+      VX[a] += fx; VY[a] += fy; VX[b] -= fx; VY[b] -= fy;
+    });
+    for(let i=0;i<n;i++){ VY[i] += (gen[i]*120 - Y[i])*0.01; VX[i] -= X[i]*0.004; }
+    for(let i=0;i<n;i++){
+      if(i===vi){ X[i] = 0; Y[i] = 0; VX[i] = 0; VY[i] = 0; continue; }
+      VX[i] *= 0.78; VY[i] *= 0.78;
+      X[i] += Math.max(-35, Math.min(35, VX[i])); Y[i] += Math.max(-35, Math.min(35, VY[i]));
+    }
+    if(it>ITER*0.5) collide();
+  }
+  for(let k=0;k<150;k++) collide();
+
+  /* 5. 平移到画布里，留出上面的标题和图例 */
+  const PADL = 44, PADR = 44, TOPPAD = 96, PADB = 44;
+  let minL = Infinity, maxR = -Infinity, minT = Infinity, maxB = -Infinity;
+  vis.forEach((id,i)=>{
+    const r = id===viewerId ? 30 : 23;
+    minL = Math.min(minL, X[i]-NET_NW/2); maxR = Math.max(maxR, X[i]+NET_NW/2);
+    minT = Math.min(minT, Y[i]-r); maxB = Math.max(maxB, Y[i]+r+34);
+  });
+  const ox = PADL - minL, oy = TOPPAD - minT;
+  const nodes = vis.map((id,i)=>({id, x:Math.round(X[i]+ox), y:Math.round(Y[i]+oy), me:id===viewerId, title:info.get(id).title, gen:gen[i], hop:hop.has(id) ? hop.get(id) : -1}));
+  return {
+    nodes, edges, hops, skipped, shown:nodes.length, total:ids.length, hidden:ids.length-vis.length,
+    types: NET_ORDER.filter(t=>edges.some(e=>e.type===t)),
+    width: Math.max(520, Math.ceil(maxR+ox+PADR)), height: Math.ceil(maxB+oy+PADB)
+  };
+}
+
+/* 每条边的路径 / 箭头 / 文字位置（拖动人物时只重算这一块） */
+function netEdgeGeoms(L){
+  const m = new Map(L.nodes.map(n=>[n.id,n])), f = v=>Math.round(v*10)/10;
+  return L.edges.map(e=>{
+    const A = m.get(e.a), B = m.get(e.b); if(!A || !B) return null;
+    const ra = A.me ? 30 : 23, rb = B.me ? 30 : 23;
+    const dx = B.x-A.x, dy = B.y-A.y, len = Math.hypot(dx,dy) || 1, off = e.off || 0;
+    const cx = (A.x+B.x)/2 - dy/len*off*2, cy = (A.y+B.y)/2 + dx/len*off*2;     // 控制点（无偏移时就是中点）
+    const unit = (px,py,tx,ty)=>{ const l = Math.hypot(tx-px,ty-py) || 1; return [(tx-px)/l, (ty-py)/l]; };
+    const ua = unit(A.x,A.y,cx,cy), ub = unit(B.x,B.y,cx,cy);
+    const sx = A.x+ua[0]*(ra+2), sy = A.y+ua[1]*(ra+2), ex = B.x+ub[0]*(rb+3), ey = B.y+ub[1]*(rb+3);
+    const d = off ? `M${f(sx)},${f(sy)}Q${f(cx)},${f(cy)} ${f(ex)},${f(ey)}` : `M${f(sx)},${f(sy)}L${f(ex)},${f(ey)}`;
+    const lx = off ? sx*0.25+cx*0.5+ex*0.25 : (sx+ex)/2, ly = off ? sy*0.25+cy*0.5+ey*0.25 : (sy+ey)/2;
+    let head = '';
+    if(e.kind==='pc'){                                                           // 箭头：父母 → 子女
+      const t = unit(cx,cy,ex,ey), bx = ex-t[0]*10, by = ey-t[1]*10, px = -t[1]*4.5, py = t[0]*4.5;
+      head = `${f(ex)},${f(ey)} ${f(bx+px)},${f(by+py)} ${f(bx-px)},${f(by-py)}`;
+    }
+    return {d, head, lx, ly};
+  });
+}
+function netLinesHtml(L, hide){
+  const G = netEdgeGeoms(L), out = [];
+  L.edges.forEach((e,i)=>{
+    const g = G[i]; if(!g || (hide && hide.has(e.type))) return;
+    const c = NET_TYPE[e.type].c;
+    out.push(`<path d="${g.d}" fill="none" stroke="${c}" stroke-width="${e.kind==='sp' ? 2.4 : 1.8}" stroke-linecap="round" stroke-opacity=".9"/>`);
+    if(g.head) out.push(`<polygon points="${g.head}" fill="${c}"/>`);
+  });
+  return out.join('');
+}
+function netLabelsHtml(L, hide, on, esc){
+  if(!on) return '';
+  const G = netEdgeGeoms(L), out = [];
+  L.edges.forEach((e,i)=>{
+    const g = G[i]; if(!g || (hide && hide.has(e.type))) return;
+    const w = Math.round(Array.from(e.label).length*10.5 + 8);
+    out.push(`<span class="kn-el" style="left:${Math.round(g.lx-w/2)}px;top:${Math.round(g.ly-7)}px;width:${w}px;color:${NET_TYPE[e.type].c}">${esc(e.label)}</span>`);
+  });
+  return out.join('');
+}
+function renderNetHtml(L, ctx, opts){
+  opts = opts || {};
+  const esc = ctx.escapeHtml, hide = opts.hide || new Set();
+  const parts = [`<div class="kt-stage" style="width:${L.width}px;height:${L.height}px">`];
+  parts.push(`<svg class="kt-lines" width="${L.width}" height="${L.height}" viewBox="0 0 ${L.width} ${L.height}" aria-hidden="true">${netLinesHtml(L, hide)}</svg>`);
+  parts.push(`<div class="kn-labels">${netLabelsHtml(L, hide, opts.labels, esc)}</div>`);
+  parts.push(`<div class="kt-title"><b>亲戚关系图</b><span>${esc(ctx.subtitle||'')}</span></div>`);
+  parts.push(`<div class="kn-lg">${L.types.filter(t=>!hide.has(t)).map(t=>`<span><i style="background:${NET_TYPE[t].c}"></i>${NET_TYPE[t].n}</span>`).join('')}</div>`);
+  L.nodes.forEach(n=>{
+    const p = ctx.personById(n.id); if(!p) return;
+    const g = p.gender==='F' ? 'f' : p.gender==='M' ? 'm' : 'o', av = n.me ? 60 : 46;
+    const src = ctx.photoSrc(p), inner = src ? `<img src="${esc(src)}" alt="">` : ctx.surnameChar(p.name);
+    const cls = 'kn-node g-' + g + (n.me ? ' me' : '') + (ctx.isDeceased(p) ? ' dead' : '');
+    parts.push(`<div class="${cls}" data-id="${esc(n.id)}" title="${esc(ctx.chain(n.id))}" style="left:${n.x-NET_NW/2}px;top:${n.y-av/2}px;width:${NET_NW}px"><div class="kn-av" style="width:${av}px;height:${av}px">${inner}</div><b class="kn-t">${esc(n.title)}</b><span class="kn-n">${esc(p.name||'')}</span></div>`);
+  });
+  parts.push('</div>');
+  return parts.join('');
+}
+
+/* ---------- 弹窗界面：表格 / 树状 / 关系图 切换、缩放、折叠展开、存图 ----------
    这一段会碰 DOM，但不依赖 app.js 里的任何全局变量：所有外部能力都从 env 传进来，方便在测试页里单独跑。
-   env: {state(), gridHtml(), ctx, viewGet(), viewSet(v), loadHtml2Canvas(), toast(msg), pick(id), fileName()} */
+   env: {state(), gridHtml(), ctx, viewGet(), viewSet(v), loadHtml2Canvas(), toast(msg), pick(id), fileName(view)} */
 function show(ov, env){
   let expanded = new Set(), scale = 1;
   const SCALES = [0.5, 0.65, 0.8, 1, 1.25, 1.5];
   const esc = env.ctx.escapeHtml;
+  // 关系图的临时状态（只在这次打开期间有效，不存盘；拖动后的位置也只保留到关闭）
+  const net = {hops:null, labels:null, hide:new Set(), L:null, key:null};
+  let drag = null, suppress = false;
+
+  function netLayoutNow(st){
+    const key = net.hops==null ? 'auto' : String(net.hops);
+    if(!net.L || net.key!==key){ net.L = networkLayout(st.people, st.kinMap, st.viewerId, {hops: net.hops==null ? undefined : net.hops}); net.key = key; }
+    return net.L;
+  }
 
   function render(){
     const st = env.state(), view = env.viewGet();
     const old = ov.querySelector('.kt-wrap, .kc-scroll');
     const keep = old ? {l: old.scrollLeft, t: old.scrollTop} : null;
     let body = '', foot = '', tools = '';
+    const zoomTools = `<button type="button" class="kc-tool" data-kc="zoomout" title="缩小">－</button><button type="button" class="kc-tool" data-kc="zoomin" title="放大">＋</button><button type="button" class="kc-tool" data-kc="shot" title="保存为图片">存图</button>`;
+    const skipNote = n=> n ? `另有 ${n} 位关系较远或资料不全（缺性别、长幼等），未列入。` : '';
     if(view==='tree'){
       const L = layout(st.people, st.kinMap, st.viewerId, {expanded});
       const ctx = Object.assign({}, env.ctx, {
@@ -298,15 +511,30 @@ function show(ov, env){
         subtitle: '以「'+st.viewerName+'」为我 · '+st.dname
       });
       body = `<div class="kt-wrap"><div class="kt-sizer" style="width:${Math.round(L.width*scale)}px;height:${Math.round(L.height*scale)}px">${renderHtml(L, ctx)}</div></div>`;
-      if(L.skipped) foot = `<div class="kc-foot">另有 ${L.skipped} 位关系较远或资料不全（缺性别、长幼等），未列入。</div>`;
-      tools = `<button type="button" class="kc-tool" data-kc="zoomout" title="缩小">－</button><button type="button" class="kc-tool" data-kc="zoomin" title="放大">＋</button><button type="button" class="kc-tool" data-kc="shot" title="保存为图片">存图</button>`;
+      if(L.skipped) foot = `<div class="kc-foot">${skipNote(L.skipped)}</div>`;
+      tools = zoomTools;
+    }else if(view==='net'){
+      const L = netLayoutNow(st);
+      if(net.labels==null) net.labels = L.edges.length<=40;      // 边太多时默认先不显示文字，免得糊成一团
+      const ctx = Object.assign({}, env.ctx, {
+        chain: id=>((st.kinMap.get(id)||{}).chain)||'',
+        subtitle: '以「'+st.viewerName+'」为我 · '+st.dname
+      });
+      const chips = NET_ORDER.filter(t=>L.types.includes(t)).map(t=>`<button type="button" class="kn-chip${net.hide.has(t)?' off':''}" data-knt="${t}" title="显示 / 隐藏这类线"><i style="background:${NET_TYPE[t].c}"></i>${NET_TYPE[t].n}</button>`).join('');
+      const bar = `<div class="kn-bar">${chips}<button type="button" class="kn-chip${net.labels?'':' off'}" data-kno="labels" title="线上的关系文字">关系名</button><button type="button" class="kn-chip" data-kno="hops" title="只显示离「我」几步以内的人">范围：${L.hops===0?'全部':L.hops+'步内'}</button></div>`;
+      body = L.nodes.length
+        ? bar + `<div class="kt-wrap"><div class="kt-sizer" style="width:${Math.round(L.width*scale)}px;height:${Math.round(L.height*scale)}px">${renderNetHtml(L, ctx, {hide:net.hide, labels:net.labels})}</div></div>`
+        : `<div class="kc-foot">没有可以显示的关系。</div>`;
+      const notes = [skipNote(L.skipped), L.hidden ? `另有 ${L.hidden} 位不在「${L.hops}步内」，点「范围」可以看更多。` : '', L.nodes.length ? '可以拖动人物挪位置，点一下人物跳到 TA。' : ''].filter(Boolean);
+      foot = notes.length ? `<div class="kc-foot">${notes.join(' ')}</div>` : '';
+      tools = zoomTools;
     }else{
       const g = env.gridHtml();
-      body = g.html; foot = g.skipped ? `<div class="kc-foot">另有 ${g.skipped} 位关系较远或资料不全（缺性别、长幼等），未列入。</div>` : '';
+      body = g.html; foot = g.skipped ? `<div class="kc-foot">${skipNote(g.skipped)}</div>` : '';
     }
     ov.innerHTML = `<div class="kc-box">
       <div class="kc-head"><div><b>亲戚图表</b> · 以「${esc(st.viewerName)}」为我 · ${esc(st.dname)}</div>
-        <div class="kc-ctl"><div class="kc-seg"><button type="button" data-kcv="grid" class="${view==='grid'?'on':''}">表格</button><button type="button" data-kcv="tree" class="${view==='tree'?'on':''}">树状</button></div>${tools}<button type="button" class="btn btn-ghost" data-kc="close">关闭</button></div></div>
+        <div class="kc-ctl"><div class="kc-seg"><button type="button" data-kcv="grid" class="${view==='grid'?'on':''}">表格</button><button type="button" data-kcv="tree" class="${view==='tree'?'on':''}">树状</button><button type="button" data-kcv="net" class="${view==='net'?'on':''}">关系图</button></div>${tools}<button type="button" class="btn btn-ghost" data-kc="close">关闭</button></div></div>
       ${body}${foot}</div>`;
     const stage = ov.querySelector('.kt-stage');
     if(stage) stage.style.transform = 'scale('+scale+')';
@@ -341,7 +569,7 @@ function show(ov, env){
       const blob = await new Promise(res=>out.toBlob(res,'image/png'));
       if(!blob) throw new Error('empty');
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = env.fileName();
+      a.href = URL.createObjectURL(blob); a.download = env.fileName(env.viewGet());
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
       env.toast('图片已保存');
@@ -352,9 +580,15 @@ function show(ov, env){
   }
 
   ov.onclick = e=>{
-    const t = e.target.closest ? e.target.closest('[data-kcv],[data-kc],.kt-card,.kc-item,.kt-pill') : null;
+    const t = e.target.closest ? e.target.closest('[data-kcv],[data-kc],[data-knt],[data-kno],.kt-card,.kn-node,.kc-item,.kt-pill') : null;
     if(!t || !ov.contains(t)) return;
     if(t.dataset.kcv){ env.viewSet(t.dataset.kcv); render(); return; }
+    if(t.dataset.knt){ const k = t.dataset.knt; if(net.hide.has(k)) net.hide.delete(k); else net.hide.add(k); render(); return; }
+    if(t.dataset.kno==='labels'){ net.labels = !net.labels; render(); return; }
+    if(t.dataset.kno==='hops'){
+      const seq = [1,2,3,0], cur = net.L ? net.L.hops : 0;
+      net.hops = seq[(seq.indexOf(cur)+1) % seq.length]; net.L = null; render(); return;
+    }
     const act = t.dataset.kc;
     if(act==='close'){ ov.style.display = 'none'; return; }
     if(act==='zoomin' || act==='zoomout'){
@@ -363,13 +597,43 @@ function show(ov, env){
     }
     if(act==='shot'){ shot(); return; }
     if(t.classList.contains('kt-pill')){ const k = t.dataset.pill; if(expanded.has(k)) expanded.delete(k); else expanded.add(k); render(); return; }
+    if(t.classList.contains('kn-node') && suppress) return;      // 刚拖完人物，别当成点击
     const id = t.dataset.id;
     if(id){ ov.style.display = 'none'; env.pick(id); }
   };
+
+  /* 关系图：拖动人物（鼠标 / 手指通用）。点一下仍然是跳到 TA，移动超过几像素才算拖动。 */
+  ov.onpointerdown = e=>{
+    const nd = e.target.closest ? e.target.closest('.kn-node') : null;
+    if(!nd || !ov.contains(nd) || !net.L || (e.button!=null && e.button>0)) return;
+    const n = net.L.nodes.find(x=>x.id===nd.dataset.id); if(!n) return;
+    drag = {n, el:nd, sx:e.clientX, sy:e.clientY, ox:n.x, oy:n.y, moved:false, pid:e.pointerId};
+    try{ nd.setPointerCapture(e.pointerId); }catch(_){}
+  };
+  ov.onpointermove = e=>{
+    if(!drag || e.pointerId!==drag.pid) return;
+    const dx = e.clientX-drag.sx, dy = e.clientY-drag.sy;
+    if(!drag.moved && Math.hypot(dx,dy)<5) return;
+    drag.moved = true;
+    const L = net.L, n = drag.n, av = n.me ? 60 : 46;
+    n.x = Math.round(Math.max(NET_NW/2+4, Math.min(L.width-NET_NW/2-4, drag.ox + dx/scale)));
+    n.y = Math.round(Math.max(100, Math.min(L.height-70, drag.oy + dy/scale)));
+    drag.el.style.left = (n.x-NET_NW/2)+'px'; drag.el.style.top = (n.y-av/2)+'px';
+    const svg = ov.querySelector('.kt-lines'), lab = ov.querySelector('.kn-labels');
+    if(svg) svg.innerHTML = netLinesHtml(L, net.hide);
+    if(lab) lab.innerHTML = netLabelsHtml(L, net.hide, net.labels, esc);
+  };
+  const endDrag = e=>{
+    if(!drag || (e && e.pointerId!==drag.pid)) return;
+    if(drag.moved){ suppress = true; setTimeout(()=>{ suppress = false; }, 0); }
+    drag = null;
+  };
+  ov.onpointerup = endDrag; ov.onpointercancel = endDrag;
+
   render();
   return {render, shot};
 }
 
-const api = {layout, renderHtml, show, BAND_LABEL, genLabel};
+const api = {layout, renderHtml, networkLayout, renderNetHtml, netEdgeGeoms, pcLabel, show, BAND_LABEL, NET_TYPE, genLabel};
 if(typeof module!=='undefined' && module.exports) module.exports = api; else root.KinTree = api;
 })(typeof window!=='undefined' ? window : globalThis);

@@ -1009,6 +1009,26 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
 .kt-card.dead{border-style:dashed; opacity:.85;}
 .kt-pill{position:absolute; box-sizing:border-box; border:1px dashed #b4532a; background:#fff6ee; color:#b4532a; border-radius:14px; font-size:12px; cursor:pointer; padding:0;}
 .kt-pill.chip{border-color:#b9a789; background:#fff; color:#8a7a68;}
+/* v8.50 亲戚图表·关系图 */
+.kn-bar{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 8px;}
+.kn-chip{border:1px solid #d9c9ad; background:#fff; border-radius:14px; padding:3px 10px; font-size:12px; color:#6b5b4b; cursor:pointer; display:inline-flex; align-items:center; gap:5px;}
+.kn-chip i{display:inline-block; width:12px; height:3px; border-radius:2px;}
+.kn-chip.off{opacity:.45;}
+.kn-labels{position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;}
+.kn-el{position:absolute; height:14px; line-height:14px; font-size:10px; font-weight:600; text-align:center; white-space:nowrap; background:rgba(251,247,240,.88); border-radius:7px;}
+.kn-lg{position:absolute; left:30px; top:34px; display:flex; flex-wrap:wrap; gap:12px; font-size:11px; color:#6b5b4b;}
+.kn-lg span{display:inline-flex; align-items:center; gap:4px;}
+.kn-lg i{display:inline-block; width:14px; height:3px; border-radius:2px;}
+.kn-node{position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; text-align:center; line-height:1.2; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;}
+.kn-node:active{cursor:grabbing;}
+.kn-av{flex:none; box-sizing:border-box; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:600; color:#6b5b4b; background:#f1e8d6; border:2.5px solid #cdbd9f; box-shadow:0 1px 4px rgba(60,40,20,.18);}
+.kn-av img{width:100%; height:100%; object-fit:cover; display:block; pointer-events:none;}
+.kn-node.g-m .kn-av{border-color:#7c9cc4; background:#e8f0fa;} .kn-node.g-f .kn-av{border-color:#d18aa0; background:#fbebf0;}
+.kn-t{max-width:100%; margin-top:2px; padding:0 3px; color:#b4532a; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:rgba(251,247,240,.85); border-radius:6px;}
+.kn-n{max-width:100%; color:#6b5b4b; font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.kn-node.me .kn-av{background:#b4532a; border-color:#d0463c; color:#fff; font-size:22px; box-shadow:0 0 0 4px rgba(208,70,60,.22);}
+.kn-node.me .kn-t{font-weight:700;}
+.kn-node.dead .kn-av{border-style:dashed; opacity:.85;}
 
 .gen-label{z-index:4;}
 </style>

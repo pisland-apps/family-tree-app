@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.49';
+const APP_VERSION = 'v8.50';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -1018,10 +1018,11 @@ function setElder(aId, bId){   // a 比 b 大：记在 a.elder 上（属于家�
   a.elder = Array.from(new Set([...(a.elder||[]), bId]));
   saveData(); render(); renderSidePanel();
 }
-/* ===== 亲戚图表：弹窗里有 表格 / 树状 两个视图（v8.27 起） =====
+/* ===== 亲戚图表：弹窗里有 表格 / 树状 / 关系图 三个视图（树状 v8.27 起，关系图 v8.50 起） =====
    表格：横向按辈分（左长辈→右晚辈），纵向分 父系 / 本人这一辈 / 母系 / 配偶一方
-   树状：kintree.js —— 真实存在的人 + 真实父母/配偶关系，我在中间、父系在上、母系在下，可折叠/缩放/存图 */
-const KIN_VIEW_KEY = 'ft_kin_chart_view_v1';   // 只记「上次看的是表格还是树状」，不含人名，仅本机
+   树状：kintree.js —— 真实存在的人 + 真实父母/配偶关系，我在中间、父系在上、母系在下，可折叠/缩放/存图
+   关系图：kintree.js —— 同一批人，画成网络图：线按 亲生/夫妻/继/养/干 分色，可拖动人物、按线类型筛选、按离「我」几步截取 */
+const KIN_VIEW_KEY = 'ft_kin_chart_view_v1';   // 只记「上次看的是 表格 / 树状 / 关系图」，不含人名，仅本机
 function kinGridHtml(){
   const GEN = {'-4':'高祖辈','-3':'曾祖辈','-2':'祖辈','-1':'父辈','0':'平辈','1':'子辈','2':'孙辈','3':'曾孙辈'};
   const SECTIONS = [['p','父系'],['self','本人这一辈与晚辈'],['m','母系'],['s','配偶一方']];
@@ -1059,11 +1060,11 @@ function openKinChart(){
         const shi = v.shi + g, ch = Paizi.charsAt(cfg, shi);
         return '父系·' + (ch ? ch.join('/') + '·' : '') + shi + '世';
       }},
-    viewGet: ()=>{ try{ return localStorage.getItem(KIN_VIEW_KEY)==='grid' ? 'grid' : 'tree'; }catch(e){ return 'tree'; } },
+    viewGet: ()=>{ try{ const v = localStorage.getItem(KIN_VIEW_KEY); return (v==='grid' || v==='net') ? v : 'tree'; }catch(e){ return 'tree'; } },
     viewSet: v=>{ try{ localStorage.setItem(KIN_VIEW_KEY, v); }catch(e){} },
     loadHtml2Canvas, toast,
     pick: id=>enterFocus(id),
-    fileName: ()=>{ const t = trees.find(x=>x.id===currentTreeId); return `${(t && t.name) || '家谱'}-亲戚图表-${new Date().toISOString().slice(0,10)}.png`; }
+    fileName: v=>{ const t = trees.find(x=>x.id===currentTreeId); return `${(t && t.name) || '家谱'}-${v==='net' ? '亲戚关系图' : '亲戚图表'}-${new Date().toISOString().slice(0,10)}.png`; }
   });
 }
 function updateViewerBar(){
