@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.52';
+const APP_VERSION = 'v8.53';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -334,8 +334,8 @@ function birthOrderLabel(p){
 function yearsLabel(p){
   if(!p.birth && !p.death) return '';
   const base = (p.birth||'?') + ' – ' + (p.death||'今');
-  const b = parseInt(p.birth, 10), d = parseInt(p.death, 10);
-  if(p.birth && p.death && !isNaN(b) && !isNaN(d) && d>=b){
+  const b = parseInt(p.birth, 10), d = deathYearNumber(p);
+  if(p.birth && p.death && !isNaN(b) && d!==null && d>=b){
     return `${base}（享年${d-b}岁）`;
   }
   return base;
@@ -355,6 +355,17 @@ function lifespanShort(p){
   return (b||'?') + '–' + d;
 }
 function isDeceased(p){ return !!((p.death||'').toString().trim()); }
+// v8.52: death 字段为 '?' 表示「已故，年份不详」。需要数字年份的地方一律走 deathYearNumber()。
+const DEATH_UNKNOWN = '?';
+function isDeathYearUnknown(p){ return (p.death||'').toString().trim() === DEATH_UNKNOWN; }
+function deathYearNumber(p){ const d = parseInt(p.death, 10); return isNaN(d) ? null : d; }
+function syncDeathUnknownUI(){
+  const cb = document.getElementById('fDeathUnknown'), inp = document.getElementById('fDeath');
+  if(!cb || !inp) return;
+  inp.disabled = cb.checked;
+  if(cb.checked) inp.value = '';
+}
+document.addEventListener('change', e=>{ if(e.target && e.target.id==='fDeathUnknown') syncDeathUnknownUI(); });
 
 /* ============ Image resize ============ */
 function resizeImageToBlob(file, maxDim=220){
@@ -2491,6 +2502,8 @@ function openModal(id, preset){
   document.getElementById('fName').value = '';
   document.getElementById('fBirth').value = '';
   document.getElementById('fDeath').value = '';
+  document.getElementById('fDeathUnknown').checked = false;
+  syncDeathUnknownUI();
   document.getElementById('fCountry').value = '';
   document.getElementById('fOrder').value = '';
   document.getElementById('fNotes').value = '';
@@ -2505,7 +2518,9 @@ function openModal(id, preset){
     const p = personById(id);
     document.getElementById('fName').value = p.name || '';
     document.getElementById('fBirth').value = p.birth || '';
-    document.getElementById('fDeath').value = p.death || '';
+    document.getElementById('fDeath').value = isDeathYearUnknown(p) ? '' : (p.death || '');
+    document.getElementById('fDeathUnknown').checked = isDeathYearUnknown(p);
+    syncDeathUnknownUI();
     document.getElementById('fCountry').value = p.country || '';
     document.getElementById('fOrder').value = p.birthOrder ? String(p.birthOrder) : '';
     document.getElementById('fNotes').value = p.notes || '';
@@ -2622,7 +2637,7 @@ function saveModal(){
   pushHistory();
   const gender = document.querySelector('input[name=gender]:checked').value;
   const birth = document.getElementById('fBirth').value.trim();
-  const death = document.getElementById('fDeath').value.trim();
+  const death = document.getElementById('fDeathUnknown').checked ? DEATH_UNKNOWN : document.getElementById('fDeath').value.trim();
   const country = document.getElementById('fCountry').value.trim();
   const notes = document.getElementById('fNotes').value.trim();
   const birthOrder = parseInt(document.getElementById('fOrder').value, 10) || undefined;
