@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.59';
+const APP_VERSION = 'v8.60';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2654,6 +2654,7 @@ function openModal(id, preset){
 
   renderParentTypes();
   updateSiblingsHint();
+  syncPhotoRemoveBtn();
   overlay.classList.add('show');
   document.getElementById('fName').focus();
 }
@@ -3317,6 +3318,17 @@ document.addEventListener('click', (e)=>{
   if(!e.target.closest('.search-wrap')) document.getElementById('searchResults').classList.remove('show');
 });
 // v8.55: 选照片后先弹出圆形取景框，只保留圈中的人，再保存为小头像
+// v8.60: 可以移除头像（回到默认的姓氏字头像）
+function syncPhotoRemoveBtn(){
+  const btn = document.getElementById('photoRemoveBtn');
+  if(btn) btn.style.display = modalPhotoId ? '' : 'none';
+}
+document.getElementById('photoRemoveBtn').addEventListener('click', ()=>{
+  modalPhotoId = null;
+  document.getElementById('photoPreview').innerHTML = '👤';
+  document.getElementById('fPhoto').value = '';
+  syncPhotoRemoveBtn();
+});
 async function applyPickedPhotoBlob(blob){
   try{
     const photoId = uid();
@@ -3326,6 +3338,7 @@ async function applyPickedPhotoBlob(blob){
     const previousPick = modalPhotoId;
     modalPhotoId = photoId;
     document.getElementById('photoPreview').innerHTML = `<img src="${objectUrl}">`;
+    syncPhotoRemoveBtn();
     // If this replaces a photo picked earlier in the same still-unsaved
     // session, that earlier upload is now orphaned (it was never attached
     // to a saved person). gcOrphanedPhotos() will confirm that and sweep it.
