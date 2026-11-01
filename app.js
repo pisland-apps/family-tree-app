@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.54';
+const APP_VERSION = 'v8.55';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -3162,11 +3162,9 @@ document.getElementById('searchInput').addEventListener('keydown', (e)=>{
 document.addEventListener('click', (e)=>{
   if(!e.target.closest('.search-wrap')) document.getElementById('searchResults').classList.remove('show');
 });
-document.getElementById('fPhoto').addEventListener('change', async (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
+// v8.55: 选照片后先弹出圆形取景框，只保留圈中的人，再保存为小头像
+async function applyPickedPhotoBlob(blob){
   try{
-    const blob = await resizeImageToBlob(file);
     const photoId = uid();
     await putPhotoBlob(photoId, blob);
     const objectUrl = URL.createObjectURL(blob);
@@ -3181,6 +3179,106 @@ document.getElementById('fPhoto').addEventListener('change', async (e)=>{
   }catch(err){
     toast('照片处理失败，请换一张试试');
   }
+}
+const CROP_OUT = 300;   // 裁切后输出 300×300
+const crop = {url:'', D:280, nw:0, nh:0, base:1, z:1, ox:0, oy:0, pointers:new Map(), pinch:null};
+const cropEls = {
+  overlay:document.getElementById('cropOverlay'), stage:document.getElementById('cropStage'),
+  img:document.getElementById('cropImg'), zoom:document.getElementById('cropZoom')
+};
+function cropScale(){ return crop.base*crop.z; }
+function cropRender(){
+  const s = cropScale(), w = crop.nw*s, h = crop.nh*s;
+  crop.ox = Math.min(0, Math.max(crop.D-w, crop.ox));      // 照片必须始终铺满取景框
+  crop.oy = Math.min(0, Math.max(crop.D-h, crop.oy));
+  cropEls.img.style.transform = `translate(${crop.ox}px,${crop.oy}px) scale(${s})`;
+  cropEls.zoom.value = crop.z;
+}
+function cropZoomAt(newZ, px, py){
+  newZ = Math.min(4, Math.max(1, newZ));
+  const s0 = cropScale(), ix = (px-crop.ox)/s0, iy = (py-crop.oy)/s0;
+  crop.z = newZ;
+  const s1 = cropScale();
+  crop.ox = px - ix*s1; crop.oy = py - iy*s1;
+  cropRender();
+}
+function cropClose(){
+  cropEls.overlay.classList.remove('show');
+  cropEls.img.removeAttribute('src');
+  if(crop.url){ URL.revokeObjectURL(crop.url); crop.url=''; }
+  crop.pointers.clear(); crop.pinch=null;
+  document.getElementById('fPhoto').value = '';   // 允许再次选择同一张照片
+}
+function cropOpen(file){
+  const url = URL.createObjectURL(file);
+  const im = new Image();
+  im.onload = ()=>{
+    crop.url = url;
+    crop.nw = im.naturalWidth; crop.nh = im.naturalHeight;
+    cropEls.img.src = url;
+    cropEls.img.style.width = crop.nw+'px'; cropEls.img.style.height = crop.nh+'px';
+    cropEls.overlay.classList.add('show');
+    crop.D = cropEls.stage.clientWidth || 280;
+    crop.base = crop.D / Math.min(crop.nw, crop.nh);        // 刚好铺满
+    crop.z = 1;
+    crop.ox = (crop.D - crop.nw*crop.base)/2;               // 默认居中
+    crop.oy = (crop.D - crop.nh*crop.base)/2;
+    cropRender();
+  };
+  im.onerror = ()=>{ URL.revokeObjectURL(url); toast('照片处理失败，请换一张试试'); document.getElementById('fPhoto').value=''; };
+  im.src = url;
+}
+function cropPt(e){ const r = cropEls.stage.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+function cropPinchInfo(){
+  const [a,b] = Array.from(crop.pointers.values());
+  return {dist:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)), mx:(a.x+b.x)/2, my:(a.y+b.y)/2};
+}
+cropEls.stage.addEventListener('pointerdown', (e)=>{
+  cropEls.stage.setPointerCapture(e.pointerId);
+  crop.pointers.set(e.pointerId, cropPt(e));
+  if(crop.pointers.size===2){ const i=cropPinchInfo(); crop.pinch={dist:i.dist, z:crop.z}; }
+});
+cropEls.stage.addEventListener('pointermove', (e)=>{
+  if(!crop.pointers.has(e.pointerId)) return;
+  const prev = crop.pointers.get(e.pointerId), cur = cropPt(e);
+  crop.pointers.set(e.pointerId, cur);
+  if(crop.pointers.size>=2 && crop.pinch){
+    const i = cropPinchInfo();
+    cropZoomAt(crop.pinch.z * i.dist/crop.pinch.dist, i.mx, i.my);
+  } else if(crop.pointers.size===1){
+    crop.ox += cur.x-prev.x; crop.oy += cur.y-prev.y;
+    cropRender();
+  }
+});
+function cropPointerEnd(e){
+  crop.pointers.delete(e.pointerId);
+  crop.pinch = null;
+}
+cropEls.stage.addEventListener('pointerup', cropPointerEnd);
+cropEls.stage.addEventListener('pointercancel', cropPointerEnd);
+cropEls.stage.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  const pt = cropPt(e);
+  cropZoomAt(crop.z * Math.exp(-e.deltaY*0.0015), pt.x, pt.y);
+}, {passive:false});
+cropEls.zoom.addEventListener('input', ()=>{ cropZoomAt(parseFloat(cropEls.zoom.value), crop.D/2, crop.D/2); });
+document.getElementById('cropCancel').addEventListener('click', cropClose);
+document.getElementById('cropClose').addEventListener('click', cropClose);
+document.getElementById('cropConfirm').addEventListener('click', ()=>{
+  const s = cropScale();
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = CROP_OUT;
+  canvas.getContext('2d').drawImage(cropEls.img, -crop.ox/s, -crop.oy/s, crop.D/s, crop.D/s, 0, 0, CROP_OUT, CROP_OUT);
+  canvas.toBlob(async (blob)=>{
+    if(!blob){ toast('照片处理失败，请换一张试试'); return; }
+    cropClose();
+    await applyPickedPhotoBlob(blob);
+  }, 'image/jpeg', 0.9);
+});
+document.getElementById('fPhoto').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  cropOpen(file);
 });
 document.getElementById('parentQuickAdd').addEventListener('click', ()=>{
   const input = document.getElementById('parentQuickName');

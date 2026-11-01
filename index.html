@@ -720,6 +720,15 @@ input[type=file]{font-size:12px;}
 }
 /* v8.52 触屏设备：画布内双指捏合只缩放树，不再缩放整个页面（PC 鼠标设备不受影响） */
 @media (pointer:coarse){ .canvas-wrap{touch-action:none;} }
+/* v8.55 头像圆形裁切 */
+#cropOverlay{z-index:150;}
+.crop-stage{position:relative; width:min(280px,76vw); aspect-ratio:1/1; margin:0 auto; overflow:hidden; background:#2a2420; border-radius:12px; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none;}
+.crop-stage:active{cursor:grabbing;}
+.crop-stage img{position:absolute; left:0; top:0; max-width:none; transform-origin:0 0; pointer-events:none; -webkit-user-drag:none;}
+.crop-ring{position:absolute; inset:0; border-radius:50%; box-shadow:0 0 0 999px rgba(20,16,12,.58); border:2px solid #fff; pointer-events:none; box-sizing:border-box;}
+.crop-zoom{display:flex; align-items:center; gap:10px; margin:14px auto 0; width:min(280px,76vw);}
+.crop-zoom input[type=range]{flex:1;}
+.crop-zoom span{font-size:18px; color:var(--ink-soft); user-select:none;}
 /* #10 slightly larger names */
 .card .cname{font-size:14.5px;}
 /* #11 undefined --border -> real token */
@@ -1423,6 +1432,31 @@ body:not(.compact-view) .card.focus-pulse{animation:ftPulse .8s ease-in-out 3;}
         <button class="btn btn-ghost" id="exportCancel">取消</button>
         <button class="btn btn-primary" id="exportConfirm">导出</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cropOverlay">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-header">
+      <h2>调整头像</h2>
+      <button class="modal-close" id="cropClose" type="button">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="crop-stage" id="cropStage">
+        <img id="cropImg" alt="">
+        <div class="crop-ring"></div>
+      </div>
+      <div class="crop-zoom">
+        <span>－</span>
+        <input type="range" id="cropZoom" min="1" max="4" step="0.01" value="1">
+        <span>＋</span>
+      </div>
+      <p class="hint" style="text-align:center;margin:10px 0 0;">拖动照片对准要的人，双指捏合或拖动滑块放大缩小（PC 可用滚轮）</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cropCancel" type="button">取消</button>
+      <button class="btn btn-primary" id="cropConfirm" type="button">确定</button>
     </div>
   </div>
 </div>
