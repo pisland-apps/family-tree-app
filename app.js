@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.51';
+const APP_VERSION = 'v8.52';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2773,16 +2773,23 @@ wrap.addEventListener('wheel', (e)=>{
 // basic touch pan/pinch
 let touchState=null;
 wrap.addEventListener('touchstart', (e)=>{
+  if(e.touches.length===2 && !e.target.closest('.quick-bar, .fab-col, .zoom-controls')){
+    e.preventDefault();   // 双指缩放只作用于树，不让浏览器缩放整个页面
+    const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+    touchState={mode:'pinch', startDist:Math.hypot(dx,dy)||1, startZoom:zoom};
+    return;
+  }
   if(e.target.closest('.card, .quick-bar, .fab-col, .zoom-controls')) return;
   if(e.touches.length===1){
     touchState={mode:'pan', startX:e.touches[0].clientX, startY:e.touches[0].clientY, origX:pan.x, origY:pan.y};
   } else if(e.touches.length===2){
     const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
-    touchState={mode:'pinch', startDist:Math.hypot(dx,dy), startZoom:zoom};
+    touchState={mode:'pinch', startDist:Math.hypot(dx,dy)||1, startZoom:zoom};
   }
-}, {passive:true});
+}, {passive:false});
 wrap.addEventListener('touchmove', (e)=>{
   if(!touchState) return;
+  if(e.touches.length===2) e.preventDefault();
   if(touchState.mode==='pan' && e.touches.length===1){
     pan.x = touchState.origX + (e.touches[0].clientX-touchState.startX);
     pan.y = touchState.origY + (e.touches[0].clientY-touchState.startY);
@@ -2793,8 +2800,10 @@ wrap.addEventListener('touchmove', (e)=>{
     zoom = Math.min(2, Math.max(0.3, touchState.startZoom * (dist/touchState.startDist)));
     applyTransform();
   }
-}, {passive:true});
+}, {passive:false});
 wrap.addEventListener('touchend', ()=>{ touchState=null; });
+// iPad Safari 原生捏合手势：仅在树画布内拦截
+['gesturestart','gesturechange','gestureend'].forEach(ev=>wrap.addEventListener(ev, e=>e.preventDefault()));
 
 /* ============ Export / Import ============ */
 function computeExportScope(scopeTreeId){

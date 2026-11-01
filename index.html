@@ -718,6 +718,8 @@ input[type=file]{font-size:12px;}
     linear-gradient(90deg, rgba(221,208,178,.35) 1px, transparent 1px);
   background-size:28px 28px;
 }
+/* v8.52 触屏设备：画布内双指捏合只缩放树，不再缩放整个页面（PC 鼠标设备不受影响） */
+@media (pointer:coarse){ .canvas-wrap{touch-action:none;} }
 /* #10 slightly larger names */
 .card .cname{font-size:14.5px;}
 /* #11 undefined --border -> real token */
