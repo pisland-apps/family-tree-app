@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.60';
+const APP_VERSION = 'v8.61';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2002,6 +2002,15 @@ function goToBridgePerson(id){
   centerTree();
   recordNavState();
 }
+// v8.61: 聚焦条的实际高度（旁支按钮换行后会变高）同步给布局，下面的树区域据此留出位置
+(function(){
+  const bar = document.getElementById('focusBar');
+  if(!bar || !window.ResizeObserver) return;
+  new ResizeObserver(()=>{
+    const h = bar.offsetHeight;
+    if(h) document.documentElement.style.setProperty('--focus-bar-h', h + 'px');
+  }).observe(bar);
+})();
 function updateFocusBar(){
   const bar = document.getElementById('focusBar');
   if(!bar) return;
