@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.57';
+const APP_VERSION = 'v8.58';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -302,6 +302,17 @@ function uid(){ return 'p_' + Math.random().toString(36).slice(2,10); }
 function personById(id){ return people.find(p=>p.id===id); }
 // v8.56: 同胞线（父母不详的兄弟姐妹）。记在 person.siblings 上（双向）。
 // 两人已有共同父母时，兄弟关系由父母体现，同胞线不再生效（不重复画）。
+// 同一组兄弟姐妹：沿同胞线一路找下去（A–B、A–C 相连时 B、C 也算同组），不含自己
+function siblingGroupOf(id, onlyVisible=false){
+  const seen = new Set([id]), stack = [id];
+  while(stack.length){
+    const cur = personById(stack.pop());
+    if(!cur) continue;
+    siblingLinksOf(cur, onlyVisible).forEach(sid=>{ if(!seen.has(sid)){ seen.add(sid); stack.push(sid); } });
+  }
+  seen.delete(id);
+  return Array.from(seen);
+}
 function sameParents(a, b){ return (a.parents||[]).some(x=>(b.parents||[]).includes(x)); }
 function siblingLinksOf(p, onlyVisible=true){
   return (p.siblings||[]).filter(sid=>{
@@ -649,7 +660,7 @@ function collectSiblingsAndDescendants(id, depthDown, set){
     });
   });
   // v8.56: 用同胞线连着的兄弟姐妹也算「旁支」
-  siblingLinksOf(p, false).forEach(sid=>{
+  siblingGroupOf(id, false).forEach(sid=>{
     if(set.has(sid)) return;
     set.add(sid);
     const sp = personById(sid);
@@ -1511,8 +1522,8 @@ function drawConnectors(){
       if(rects.length<2) return;
       const topOf = c=> compact ? c.avTop : c.top;
       const y = Math.min(...rects.map(topOf)) - 14;
-      // 最左的竖线靠右一点、最右的靠左一点、中间的居中，避开卡片正上方可能有的父母连线
-      const xs = rects.map((c,i)=> i===0 ? c.cx+16 : (i===rects.length-1 ? c.cx-16 : c.cx));
+      // 竖线落在头像正上方中央（左上的「i」和右上的数字标记都不会挡住）
+      const xs = rects.map(c=>c.cx);
       if(xs[xs.length-1] <= xs[0]) return;
       let d = `M ${xs[0]} ${y} L ${xs[xs.length-1]} ${y}`;
       rects.forEach((c,i)=>{ d += ` M ${xs[i]} ${y} L ${xs[i]} ${topOf(c)}`; });
