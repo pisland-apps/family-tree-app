@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.53';
+const APP_VERSION = 'v8.54';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2892,7 +2892,9 @@ async function exportData(scopeTreeId, encryptPasscode){
 
     const zipBlob = await zip.generateAsync({type:'blob'});
     const label = scopeTreeId ? (exportTrees[0].name || '家族树').replace(/[\\/:*?"<>|]+/g,'-') : 'family-tree';
-    const dateStr = new Date().toISOString().slice(0,10);
+    // v8.54: 文件名用本地日期+时间（YYYY-MM-DD-HHMM），避免同日重名被浏览器改成 (1)，也避免 UTC 日期差一天
+    const _n = new Date(), _p = x=>String(x).padStart(2,'0');
+    const dateStr = `${_n.getFullYear()}-${_p(_n.getMonth()+1)}-${_p(_n.getDate())}-${_p(_n.getHours())}${_p(_n.getMinutes())}`;
 
     let outBlob, filename;
     if(encryptPasscode){
