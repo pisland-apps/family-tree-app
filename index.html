@@ -45,6 +45,8 @@
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;width:100%;height:100%;overflow-x:hidden;}
+/* 平板双指缩放时，禁止浏览器对整个页面做原生缩放/滚动，避免顶部/侧边/底部菜单被推出视野 */
+html,body{position:fixed; inset:0; overflow:hidden; overscroll-behavior:none; touch-action:manipulation; -webkit-text-size-adjust:100%;}
 body{
   font-family:'Inter',sans-serif;
   background:
@@ -205,6 +207,7 @@ body.has-focus-bar .app{
   flex:1;
   position:relative;
   overflow:hidden;
+  touch-action:none; overscroll-behavior:none;
   background:
     linear-gradient(var(--bg-alt) 1px, transparent 1px),
     linear-gradient(90deg, var(--bg-alt) 1px, transparent 1px);

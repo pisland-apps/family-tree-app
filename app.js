@@ -3,7 +3,7 @@
    they're independent strings in separate files, nothing keeps them in sync
    automatically. This one is just for you to visually confirm you're on the
    latest build; it has no effect on caching. */
-const APP_VERSION = 'v8.51';
+const APP_VERSION = 'v8.52';
 const APP_VERSION_DATE = '2026-11-01';
 (function initVersionBadge(){
   const el = document.getElementById('versionBadge');
@@ -2770,31 +2770,52 @@ wrap.addEventListener('wheel', (e)=>{
   applyTransform();
 }, {passive:false});
 
-// basic touch pan/pinch
+// touch pan/pinch（以双指中点为缩放中心；阻止浏览器原生页面缩放，避免菜单被挤出视野）
 let touchState=null;
+const _tDist = t=>Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
+const _tMid  = t=>({x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2});
+function _startPinch(e){
+  const r = wrap.getBoundingClientRect(), m=_tMid(e.touches);
+  touchState={mode:'pinch', startDist:Math.max(1,_tDist(e.touches)), startZoom:zoom,
+              // 缩放中心在画布坐标系中的位置（缩放过程中保持不动）
+              cx:(m.x-r.left-pan.x)/zoom, cy:(m.y-r.top-pan.y)/zoom};
+}
 wrap.addEventListener('touchstart', (e)=>{
+  if(e.touches.length>=2){ _startPinch(e); e.preventDefault(); return; }   // 双指：即使落在卡片上也算缩放
   if(e.target.closest('.card, .quick-bar, .fab-col, .zoom-controls')) return;
-  if(e.touches.length===1){
-    touchState={mode:'pan', startX:e.touches[0].clientX, startY:e.touches[0].clientY, origX:pan.x, origY:pan.y};
-  } else if(e.touches.length===2){
-    const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
-    touchState={mode:'pinch', startDist:Math.hypot(dx,dy), startZoom:zoom};
-  }
-}, {passive:true});
+  touchState={mode:'pan', startX:e.touches[0].clientX, startY:e.touches[0].clientY, origX:pan.x, origY:pan.y};
+}, {passive:false});
 wrap.addEventListener('touchmove', (e)=>{
-  if(!touchState) return;
-  if(touchState.mode==='pan' && e.touches.length===1){
+  if(e.touches.length>=2){
+    e.preventDefault();
+    if(!touchState || touchState.mode!=='pinch') _startPinch(e);
+    const r = wrap.getBoundingClientRect(), m=_tMid(e.touches);
+    zoom = Math.min(2, Math.max(0.3, touchState.startZoom * (_tDist(e.touches)/touchState.startDist)));
+    pan.x = m.x - r.left - touchState.cx*zoom;     // 同时支持双指拖动平移
+    pan.y = m.y - r.top  - touchState.cy*zoom;
+    applyTransform();
+    return;
+  }
+  if(touchState && touchState.mode==='pan' && e.touches.length===1){
+    e.preventDefault();
     pan.x = touchState.origX + (e.touches[0].clientX-touchState.startX);
     pan.y = touchState.origY + (e.touches[0].clientY-touchState.startY);
     applyTransform();
-  } else if(touchState.mode==='pinch' && e.touches.length===2){
-    const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
-    const dist=Math.hypot(dx,dy);
-    zoom = Math.min(2, Math.max(0.3, touchState.startZoom * (dist/touchState.startDist)));
-    applyTransform();
   }
-}, {passive:true});
-wrap.addEventListener('touchend', ()=>{ touchState=null; });
+}, {passive:false});
+function _endTouch(e){
+  if(e.touches.length===1){   // 双指抬起一根后，剩余一指继续平移
+    touchState={mode:'pan', startX:e.touches[0].clientX, startY:e.touches[0].clientY, origX:pan.x, origY:pan.y};
+  } else if(e.touches.length===0){ touchState=null; }
+}
+wrap.addEventListener('touchend', _endTouch);
+wrap.addEventListener('touchcancel', ()=>{ touchState=null; });
+// iOS/iPadOS Safari 的原生捏合手势：整页禁止，否则整个界面（含上/侧/下菜单）会被放大并移出视野
+['gesturestart','gesturechange','gestureend'].forEach(ev=>document.addEventListener(ev, e=>e.preventDefault(), {passive:false}));
+// 兜底：任何位置的多指触摸都不允许触发页面缩放/滚动（面板内的单指滚动不受影响）
+document.addEventListener('touchmove', e=>{ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+// 万一页面仍被缩放/滚动，立即复位
+window.addEventListener('scroll', ()=>{ if(window.scrollX||window.scrollY) window.scrollTo(0,0); }, {passive:true});
 
 /* ============ Export / Import ============ */
 function computeExportScope(scopeTreeId){
